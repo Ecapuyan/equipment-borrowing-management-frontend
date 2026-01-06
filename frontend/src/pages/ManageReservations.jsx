@@ -3,30 +3,35 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Typography, Box, CircularProgress, Card, CardContent, Chip, Button,
   Modal, Fade, Backdrop, Grid, Divider, List, ListItem, ListItemText, Paper, Link,
-  FormControlLabel, Switch, TextField, Select, MenuItem, FormControl, InputLabel
+  FormControlLabel, Switch, TextField, Select, MenuItem, FormControl, InputLabel,
+  useTheme, IconButton, Tooltip
 } from '@mui/material';
-import { DataGrid } from '@mui/x-data-grid';
+import { DataGrid, gridClasses } from '@mui/x-data-grid';
 import { db } from '../firebase';
 import { collection, getDocs, doc, updateDoc, query, where, addDoc, Timestamp } from 'firebase/firestore';
 import { useSnackbar } from '../context/SnackbarContextDef';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 
 const modalStyle = {
   position: 'absolute',
   top: '50%',
   left: '50%',
   transform: 'translate(-50%, -50%)',
-  width: { xs: '90%', sm: 500 }, // Narrower for single column
+  width: { xs: '90%', sm: 600 },
   bgcolor: 'background.paper',
   boxShadow: 24,
-  p: 4,
-  borderRadius: 2,
+  p: 0,
+  borderRadius: 3,
   maxHeight: '90vh',
-  overflowY: 'auto'
+  overflowY: 'auto',
+  display: 'flex',
+  flexDirection: 'column'
 };
 
 const returnModalStyle = {
   ...modalStyle,
-  width: { xs: '90%', sm: 600 },
+  p: 4,
 };
 
 function ManageReservations() {
@@ -34,6 +39,7 @@ function ManageReservations() {
   const [equipments, setEquipments] = useState([]);
   const [loading, setLoading] = useState(true);
   const { showSnackbar } = useSnackbar();
+  const theme = useTheme();
   
   // Detail Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -120,7 +126,7 @@ function ManageReservations() {
       showSnackbar(`Reservation marked as returned${returnIssue.hasIssue ? ' with incident report' : ''}.`, 'success');
       fetchData();
       setReturnModalOpen(false);
-      handleCloseModal(); // Close the main details modal too
+      handleCloseModal(); 
 
     } catch (err) {
       console.error("Error processing return:", err);
@@ -165,45 +171,89 @@ function ManageReservations() {
   };
   
   const columns = [
-    { field: 'fullName', headerName: 'Resident Name', flex: 1.5 },
-    { field: 'reason', headerName: 'Reason', flex: 2 },
+    { field: 'fullName', headerName: 'Resident Name', flex: 1.5, minWidth: 150 },
+    { field: 'reason', headerName: 'Reason', flex: 2, minWidth: 200 },
     {
       field: 'items',
       headerName: 'Equipments',
       flex: 1,
+      minWidth: 150,
       renderCell: (params) => {
         const itemCount = Array.isArray(params.row.items) ? params.row.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
-        return `${itemCount} Equipment${itemCount !== 1 ? 's' : ''}`;
+        return (
+            <Chip 
+                label={`${itemCount} Item${itemCount !== 1 ? 's' : ''}`} 
+                size="small" 
+                variant="outlined"
+            />
+        );
       },
     },
     {
-      field: 'reservationDate', headerName: 'Date', flex: 1,
+      field: 'reservationDate', headerName: 'Date', flex: 1, minWidth: 120,
       renderCell: (params) => (params.value ? new Date(params.value.seconds * 1000).toLocaleDateString() : 'N/A'),
     },
     {
-      field: 'status', headerName: 'Status', flex: 1,
+      field: 'status', headerName: 'Status', flex: 1, minWidth: 120,
       renderCell: (params) => {
         const status = params.value;
         let color = 'default';
         if (status === 'pending') color = 'warning';
         if (status === 'approved') color = 'success';
         if (status === 'rejected' || status === 'cancelled' || status === 'returned') color = 'error';
-        return <Chip label={status} color={color} variant="outlined" size="small" sx={{textTransform: 'capitalize'}}/>;
+        return (
+            <Chip 
+                label={status} 
+                color={color} 
+                size="small" 
+                sx={{ textTransform: 'capitalize', fontWeight: 'bold' }}
+            />
+        );
       },
     },
     {
-        field: 'actions', headerName: 'Actions', sortable: false, flex: 1,
-        renderCell: (params) => (<Button onClick={() => handleOpenModal(params.row)} size="small">View Details</Button>),
+        field: 'actions', headerName: 'Actions', sortable: false, flex: 1, minWidth: 100, align: 'right', headerAlign: 'right',
+        renderCell: (params) => (
+            <Tooltip title="View Details">
+                <IconButton onClick={() => handleOpenModal(params.row)} color="primary" size="small">
+                    <VisibilityIcon />
+                </IconButton>
+            </Tooltip>
+        ),
     },
   ];
 
   return (
     <>
-      <Card>
-        <CardContent>
-          <Typography variant="h5" gutterBottom>Manage All Reservations</Typography>
-          <Box sx={{ height: 650, width: '100%', '& .capitalize': { textTransform: 'capitalize' } }}>
-            <DataGrid rows={reservations} columns={columns} loading={loading} getRowId={(row) => row.id} />
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" fontWeight="bold" gutterBottom>Reservations</Typography>
+        <Typography variant="subtitle1" color="text.secondary">Manage and track all equipment borrowing requests.</Typography>
+      </Box>
+
+      <Card sx={{ boxShadow: theme.shadows[2], borderRadius: 2 }}>
+        <CardContent sx={{ p: 0 }}>
+          <Box sx={{ height: 650, width: '100%' }}>
+            <DataGrid
+                rows={reservations}
+                columns={columns}
+                loading={loading}
+                getRowId={(row) => row.id}
+                sx={{
+                    border: 'none',
+                    '& .MuiDataGrid-columnHeaders': {
+                        backgroundColor: theme.palette.grey[50],
+                        color: theme.palette.text.primary,
+                        fontSize: '0.9rem',
+                        fontWeight: 'bold',
+                    },
+                    [`& .${gridClasses.row}.even`]: {
+                        backgroundColor: theme.palette.grey[50],
+                    },
+                    '& .MuiDataGrid-cell': {
+                        borderBottom: `1px solid ${theme.palette.divider}`,
+                    }
+                }}
+            />
           </Box>
         </CardContent>
       </Card>
@@ -212,40 +262,107 @@ function ManageReservations() {
       <Modal open={modalOpen} onClose={handleCloseModal} closeAfterTransition BackdropComponent={Backdrop} BackdropProps={{ timeout: 500 }}>
         <Fade in={modalOpen}>
           <Box sx={modalStyle}>
-            <Typography variant="h5" component="h2" gutterBottom sx={{ textAlign: 'center' }}>Reservation Details</Typography>
-            {selectedReservation && (
-              <Box>
-                <Divider sx={{ my: 2 }}><Chip label="Borrower Information" /></Divider>
-                <Typography><strong>Name:</strong> {selectedReservation.fullName}</Typography>
-                <Typography sx={{mt:1}}><strong>Phone:</strong> {selectedReservation.phoneNumber}</Typography>
-                <Typography sx={{mt:1}}><strong>Address:</strong> {selectedReservation.address}</Typography>
-                <Typography sx={{mt:1}}><strong>Request Date:</strong> {selectedReservation.requestDate ? new Date(selectedReservation.requestDate.seconds * 1000).toLocaleDateString() : 'N/A'}</Typography>
-                
-                <Divider sx={{ my: 2 }}><Chip label="Request Details" /></Divider>
-                <Typography><strong>Pick-up Date:</strong> {selectedReservation.reservationDate ? new Date(selectedReservation.reservationDate.seconds * 1000).toLocaleDateString() : 'N/A'}</Typography>
-                <Typography sx={{mt:1}}><strong>Time Slot:</strong> <Chip component="span" label={selectedReservation.timeSlot} size="small" sx={{textTransform: 'capitalize'}}/></Typography>
-                <Typography sx={{mt:1}}><strong>Reason:</strong> {selectedReservation.reason}</Typography>
-                <Typography sx={{mt:1}}><strong>Items Requested:</strong></Typography>
-                <Paper variant="outlined" sx={{ p: 1, mt: 0.5 }}><List dense>{Array.isArray(selectedReservation.items) ? selectedReservation.items.map(item => (<ListItem key={item.id}><ListItemText primary={item.name} secondary={`Quantity: ${item.quantity}`}/></ListItem>)) : <ListItem><ListItemText primary="N/A" /></ListItem>}</List></Paper>
+            {/* Header */}
+            <Box sx={{ p: 3, bgcolor: 'primary.main', color: 'white' }}>
+                 <Typography variant="h6" fontWeight="bold">Reservation Details</Typography>
+            </Box>
 
-                <Divider sx={{ my: 2 }}><Chip label="Verification Documents" /></Divider>
-                <Typography variant="subtitle1" gutterBottom>ID Card</Typography>
-                {selectedReservation.idCardUrl ? <Box component="img" src={selectedReservation.idCardUrl} sx={{width: '100%', maxWidth: 300, height: 'auto', borderRadius: 1, border: '1px solid #ddd'}}/> : <Typography>Not Provided</Typography>}
-                <Typography variant="subtitle1" gutterBottom sx={{mt:2}}>Selfie with ID</Typography>
-                {selectedReservation.selfieUrl ? <Box component="img" src={selectedReservation.selfieUrl} sx={{width: '100%', maxWidth: 300, height: 'auto', borderRadius: 1, border: '1px solid #ddd'}}/> : <Typography>Not Provided</Typography>}
+            {/* Content */}
+            <Box sx={{ p: 4, overflowY: 'auto', flexGrow: 1 }}>
+                {selectedReservation && (
+                <Grid container spacing={3}>
+                    {/* Borrower Info Section */}
+                    <Grid item xs={12}>
+                        <Typography variant="subtitle2" color="primary" gutterBottom sx={{ textTransform: 'uppercase', letterSpacing: 1, fontWeight: 'bold' }}>Borrower Info</Typography>
+                        <Paper variant="outlined" sx={{ p: 2 }}>
+                            <Grid container spacing={2}>
+                                <Grid item xs={6}>
+                                    <Typography variant="caption" color="text.secondary">Name</Typography>
+                                    <Typography variant="body2" fontWeight="medium">{selectedReservation.fullName}</Typography>
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <Typography variant="caption" color="text.secondary">Phone</Typography>
+                                    <Typography variant="body2" fontWeight="medium">{selectedReservation.phoneNumber}</Typography>
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <Typography variant="caption" color="text.secondary">Address</Typography>
+                                    <Typography variant="body2" fontWeight="medium">{selectedReservation.address}</Typography>
+                                </Grid>
+                            </Grid>
+                        </Paper>
+                    </Grid>
 
-                <Divider sx={{ my: 2 }}><Chip label="Actions" /></Divider>
-                <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 1 }}>
-                  {selectedReservation.status === 'pending' && (
+                    {/* Request Details Section */}
+                    <Grid item xs={12}>
+                        <Typography variant="subtitle2" color="primary" gutterBottom sx={{ textTransform: 'uppercase', letterSpacing: 1, fontWeight: 'bold', mt: 2 }}>Request Details</Typography>
+                        <Paper variant="outlined" sx={{ p: 2 }}>
+                            <Grid container spacing={2}>
+                                <Grid item xs={6}>
+                                    <Typography variant="caption" color="text.secondary">Pick-up Date</Typography>
+                                    <Typography variant="body2" fontWeight="medium">{selectedReservation.reservationDate ? new Date(selectedReservation.reservationDate.seconds * 1000).toLocaleDateString() : 'N/A'}</Typography>
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <Typography variant="caption" color="text.secondary">Time Slot</Typography>
+                                    <Typography variant="body2" fontWeight="medium" sx={{ textTransform: 'capitalize' }}>{selectedReservation.timeSlot}</Typography>
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <Typography variant="caption" color="text.secondary">Reason</Typography>
+                                    <Typography variant="body2">{selectedReservation.reason}</Typography>
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <Divider sx={{ my: 1 }} />
+                                    <Typography variant="caption" color="text.secondary" gutterBottom>Items Requested</Typography>
+                                    <List dense disablePadding>
+                                        {Array.isArray(selectedReservation.items) ? selectedReservation.items.map(item => (
+                                            <ListItem key={item.id} disableGutters>
+                                                <ListItemText primary={item.name} secondary={`Qty: ${item.quantity}`} />
+                                            </ListItem>
+                                        )) : <Typography variant="caption">N/A</Typography>}
+                                    </List>
+                                </Grid>
+                            </Grid>
+                        </Paper>
+                    </Grid>
+
+                    {/* Verification Documents */}
+                    <Grid item xs={12}>
+                         <Typography variant="subtitle2" color="primary" gutterBottom sx={{ textTransform: 'uppercase', letterSpacing: 1, fontWeight: 'bold', mt: 2 }}>Documents</Typography>
+                         <Grid container spacing={2}>
+                             <Grid item xs={6}>
+                                <Typography variant="caption" display="block" gutterBottom>ID Card</Typography>
+                                {selectedReservation.idCardUrl ? 
+                                    <Box component="img" src={selectedReservation.idCardUrl} sx={{ width: '100%', borderRadius: 1, border: '1px solid #ddd', maxHeight: 150, objectFit: 'cover' }} /> 
+                                    : <Typography variant="caption">Not Provided</Typography>
+                                }
+                             </Grid>
+                             <Grid item xs={6}>
+                                <Typography variant="caption" display="block" gutterBottom>Selfie</Typography>
+                                {selectedReservation.selfieUrl ? 
+                                    <Box component="img" src={selectedReservation.selfieUrl} sx={{ width: '100%', borderRadius: 1, border: '1px solid #ddd', maxHeight: 150, objectFit: 'cover' }} /> 
+                                    : <Typography variant="caption">Not Provided</Typography>
+                                }
+                             </Grid>
+                         </Grid>
+                    </Grid>
+                </Grid>
+                )}
+            </Box>
+
+            {/* Footer Actions */}
+            <Box sx={{ p: 3, bgcolor: 'grey.50', display: 'flex', justifyContent: 'flex-end', gap: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                <Button onClick={handleCloseModal} variant="outlined">Close</Button>
+                {selectedReservation && selectedReservation.status === 'pending' && (
                     <>
-                      <Button onClick={() => handleStatusUpdate(selectedReservation, 'approved')} variant="contained" color="success">Approve Request</Button>
-                      <Button onClick={() => handleStatusUpdate(selectedReservation, 'rejected')} variant="contained" color="error">Reject Request</Button>
+                        <Button onClick={() => handleStatusUpdate(selectedReservation, 'rejected')} variant="contained" color="error">Reject</Button>
+                        <Button onClick={() => handleStatusUpdate(selectedReservation, 'approved')} variant="contained" color="success">Approve</Button>
                     </>
-                  )}
-                  {selectedReservation.status === 'approved' && (<Button onClick={handleOpenReturnModal} variant="contained">Mark as Returned</Button>)}
-                </Box>
-              </Box>
-            )}
+                )}
+                {selectedReservation && selectedReservation.status === 'approved' && (
+                    <Button onClick={handleOpenReturnModal} variant="contained" startIcon={<AssignmentTurnedInIcon />}>
+                        Mark Returned
+                    </Button>
+                )}
+            </Box>
           </Box>
         </Fade>
       </Modal>
@@ -254,62 +371,63 @@ function ManageReservations() {
       <Modal open={returnModalOpen} onClose={() => setReturnModalOpen(false)} closeAfterTransition BackdropComponent={Backdrop} BackdropProps={{ timeout: 500 }}>
         <Fade in={returnModalOpen}>
             <Box sx={returnModalStyle}>
-                <Typography variant="h5" gutterBottom>Return Inspection</Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>Check the condition of the returned items.</Typography>
+                <Typography variant="h5" fontWeight="bold" gutterBottom>Return Inspection</Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom sx={{ mb: 3 }}>Check the condition of the returned items.</Typography>
                 
-                <FormControlLabel 
-                    control={<Switch checked={returnIssue.hasIssue} onChange={(e) => setReturnIssue(p => ({...p, hasIssue: e.target.checked}))} />} 
-                    label="Report Damages or Missing Items" 
-                />
+                <Paper variant="outlined" sx={{ p: 2, mb: 3, bgcolor: returnIssue.hasIssue ? '#fff5f5' : 'transparent', borderColor: returnIssue.hasIssue ? 'error.light' : 'divider' }}>
+                    <FormControlLabel 
+                        control={<Switch checked={returnIssue.hasIssue} onChange={(e) => setReturnIssue(p => ({...p, hasIssue: e.target.checked}))} color="error" />} 
+                        label={<Typography fontWeight="bold" color={returnIssue.hasIssue ? 'error' : 'text.primary'}>Report Damages or Missing Items</Typography>}
+                    />
 
-                {returnIssue.hasIssue && (
-                    <Box sx={{ mt: 2, p: 2, bgcolor: '#fff0f0', borderRadius: 1 }}>
-                        <Typography variant="subtitle2" color="error" gutterBottom>Incident Details</Typography>
-                        <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-                            <InputLabel>Affected Item</InputLabel>
-                            <Select 
-                                value={returnIssue.itemId} 
-                                label="Affected Item"
-                                onChange={(e) => setReturnIssue(p => ({...p, itemId: e.target.value}))}
-                            >
-                                {selectedReservation?.items?.map(item => (
-                                    <MenuItem key={item.id} value={item.id}>{item.name}</MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                        <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-                            <InputLabel>Issue Type</InputLabel>
-                            <Select 
-                                value={returnIssue.type} 
-                                label="Issue Type"
-                                onChange={(e) => setReturnIssue(p => ({...p, type: e.target.value}))}
-                            >
-                                <MenuItem value="damaged">Damaged</MenuItem>
-                                <MenuItem value="lost">Lost</MenuItem>
-                            </Select>
-                        </FormControl>
-                        <TextField 
-                            fullWidth 
-                            multiline 
-                            rows={3} 
-                            label="Description of Damage/Loss" 
-                            size="small" 
-                            sx={{ mb: 2 }} 
-                            value={returnIssue.description}
-                            onChange={(e) => setReturnIssue(p => ({...p, description: e.target.value}))}
-                        />
-                         <TextField 
-                            fullWidth 
-                            type="number" 
-                            label="Estimated Cost (PHP)" 
-                            size="small" 
-                            value={returnIssue.cost}
-                            onChange={(e) => setReturnIssue(p => ({...p, cost: e.target.value}))}
-                        />
-                    </Box>
-                )}
+                    {returnIssue.hasIssue && (
+                        <Box sx={{ mt: 2 }}>
+                            <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                                <InputLabel>Affected Item</InputLabel>
+                                <Select 
+                                    value={returnIssue.itemId} 
+                                    label="Affected Item"
+                                    onChange={(e) => setReturnIssue(p => ({...p, itemId: e.target.value}))}
+                                >
+                                    {selectedReservation?.items?.map(item => (
+                                        <MenuItem key={item.id} value={item.id}>{item.name}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                            <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                                <InputLabel>Issue Type</InputLabel>
+                                <Select 
+                                    value={returnIssue.type} 
+                                    label="Issue Type"
+                                    onChange={(e) => setReturnIssue(p => ({...p, type: e.target.value}))}
+                                >
+                                    <MenuItem value="damaged">Damaged</MenuItem>
+                                    <MenuItem value="lost">Lost</MenuItem>
+                                </Select>
+                            </FormControl>
+                            <TextField 
+                                fullWidth 
+                                multiline 
+                                rows={3} 
+                                label="Description of Damage/Loss" 
+                                size="small" 
+                                sx={{ mb: 2 }} 
+                                value={returnIssue.description}
+                                onChange={(e) => setReturnIssue(p => ({...p, description: e.target.value}))}
+                            />
+                            <TextField 
+                                fullWidth 
+                                type="number" 
+                                label="Estimated Cost (PHP)" 
+                                size="small" 
+                                value={returnIssue.cost}
+                                onChange={(e) => setReturnIssue(p => ({...p, cost: e.target.value}))}
+                            />
+                        </Box>
+                    )}
+                </Paper>
 
-                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
                     <Button onClick={() => setReturnModalOpen(false)}>Cancel</Button>
                     <Button variant="contained" color="primary" onClick={handleReturnSubmit}>Confirm Return</Button>
                 </Box>

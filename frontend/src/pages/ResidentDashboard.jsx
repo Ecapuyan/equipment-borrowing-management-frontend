@@ -2,63 +2,87 @@
 import React from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import {
-  Container,
   Typography,
   Grid,
   Card,
   CardContent,
-  CardActions,
-  Button,
-  Box
+  CardActionArea,
+  Box,
+  Avatar,
+  useTheme
 } from '@mui/material';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import BookOnlineIcon from '@mui/icons-material/BookOnline';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { useAuth } from '../context/AuthContextDef';
 
 function ResidentDashboard() {
   const { currentUser } = useAuth();
+  const theme = useTheme();
 
   const dashboardItems = [
     {
-      title: 'Equipment Catalog',
-      description: 'Browse all available equipment and make new reservations.',
-      path: '/resident/catalog',
-      icon: <ViewListIcon sx={{ fontSize: 40 }} color="primary" />
+      title: 'Borrow Equipment',
+      description: 'Browse the catalog and submit a new borrowing request.',
+      path: '/resident/borrow-equipment',
+      icon: <ViewListIcon sx={{ fontSize: 32, color: 'white' }} />,
+      color: 'linear-gradient(135deg, #0f766e 0%, #0d9488 100%)' // Teal
     },
     {
       title: 'My Reservations',
-      description: 'View your active and past equipment reservations.',
+      description: 'Track the status of your requests and view history.',
       path: '/resident/my-reservations',
-      icon: <BookOnlineIcon sx={{ fontSize: 40 }} color="primary" />
+      icon: <BookOnlineIcon sx={{ fontSize: 32, color: 'white' }} />,
+      color: 'linear-gradient(135deg, #ea580c 0%, #f97316 100%)' // Orange
     },
+    {
+      title: 'My Profile',
+      description: 'Update your personal information and contact details.',
+      path: '/profile',
+      icon: <AccountCircleIcon sx={{ fontSize: 32, color: 'white' }} />,
+      color: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' // Indigo
+    }
   ];
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        Resident Dashboard
-      </Typography>
-      <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 4 }}>
-        Welcome, {currentUser?.email}.
-      </Typography>
+      <Box sx={{ mb: 5 }}>
+        <Typography variant="h4" fontWeight="bold" gutterBottom>
+           Resident Portal
+        </Typography>
+        <Typography variant="subtitle1" color="text.secondary">
+           Welcome back, <Box component="span" fontWeight="bold" color="primary.main">{currentUser?.email?.split('@')[0]}</Box>. What would you like to do today?
+        </Typography>
+      </Box>
+
       <Grid container spacing={3}>
         {dashboardItems.map((item) => (
-          <Grid item xs={12} md={6} key={item.title}>
-            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <CardContent sx={{ flexGrow: 1 }}>
+          <Grid item xs={12} sm={6} md={4} key={item.title}>
+            <Card 
+              sx={{ 
+                height: '100%', 
+                transition: 'transform 0.2s, box-shadow 0.2s',
+                '&:hover': {
+                  transform: 'translateY(-4px)',
+                  boxShadow: theme.shadows[8]
+                }
+              }}
+            >
+              <CardActionArea component={RouterLink} to={item.path} sx={{ height: '100%', p: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  {item.icon}
-                  <Typography variant="h6" component="div" sx={{ ml: 2 }}>
-                    {item.title}
-                  </Typography>
+                   <Avatar variant="rounded" sx={{ background: item.color, width: 56, height: 56, boxShadow: 2 }}>
+                      {item.icon}
+                   </Avatar>
                 </Box>
-                <Typography variant="body2" color="text.secondary">
-                  {item.description}
-                </Typography>
-              </CardContent>
-              <CardActions>
-                <Button component={RouterLink} to={item.path} size="small">Go to Page</Button>
-              </CardActions>
+                <CardContent sx={{ p: 0 }}>
+                    <Typography variant="h6" fontWeight="bold" gutterBottom>
+                        {item.title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        {item.description}
+                    </Typography>
+                </CardContent>
+              </CardActionArea>
             </Card>
           </Grid>
         ))}

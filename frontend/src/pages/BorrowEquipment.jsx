@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Typography, Box, CircularProgress, Card, CardContent, Grid, TextField, Button,
-  Modal, Fade, Backdrop, Select, MenuItem, FormControl,
+  Modal, Fade, Backdrop, Select, MenuItem, FormControl, InputLabel,
   IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, List, ListItem, ListItemText,
-  Stepper, Step, StepLabel, StepContent
+  Stepper, Step, StepLabel, StepContent, useTheme, Divider
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { db, storage } from '../firebase';
@@ -15,154 +15,212 @@ import { useSnackbar } from '../context/SnackbarContextDef';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import AvailabilityCalendar from '../components/AvailabilityCalendar';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 const style = {
   position: 'absolute',
   top: '50%',
   left: '50%',
   transform: 'translate(-50%, -50%)',
-  width: { xs: '90%', sm: '80%', md: 700 },
+  width: { xs: '95%', md: 800 },
   bgcolor: 'background.paper',
   boxShadow: 24,
-  p: 4,
-  borderRadius: 2,
+  p: 0, 
+  borderRadius: 3,
   maxHeight: '90vh',
   overflowY: 'auto',
+  display: 'flex',
+  flexDirection: 'column'
 };
 
 const calendarModalStyle = {
   ...style,
   width: { xs: '95%', md: 900 },
+  p: 4
 };
 
 // --- Step Content Components ---
 const Step1BorrowerInfo = ({ requestorInfo, handleInfoChange }) => (
-  <Grid container spacing={2}>
-    <Grid item xs={12}><TextField fullWidth required label="Full Name" name="fullName" value={requestorInfo.fullName} onChange={handleInfoChange} /></Grid>
-    <Grid item xs={12}><TextField fullWidth required label="Address" name="address" value={requestorInfo.address} onChange={handleInfoChange} /></Grid>
-    <Grid item xs={12}><TextField fullWidth required label="Phone Number" name="phoneNumber" value={requestorInfo.phoneNumber} onChange={handleInfoChange} /></Grid>
+  <Grid container spacing={3}>
+    <Grid item xs={12}><TextField fullWidth required label="Full Name" name="fullName" value={requestorInfo.fullName} onChange={handleInfoChange} variant="outlined" /></Grid>
+    <Grid item xs={12}><TextField fullWidth required label="Address" name="address" value={requestorInfo.address} onChange={handleInfoChange} variant="outlined" /></Grid>
+    <Grid item xs={12}><TextField fullWidth required label="Phone Number" name="phoneNumber" value={requestorInfo.phoneNumber} onChange={handleInfoChange} variant="outlined" /></Grid>
   </Grid>
 );
 
 const Step2RequestDetails = ({ reservationDate, setReservationDate, timeSlot, setTimeSlot, reason, setReason, onCheckAvailability }) => {
     const maxDate = new Date();
-    maxDate.setDate(maxDate.getDate() + 30); // 30 days from today
+    maxDate.setDate(maxDate.getDate() + 30); 
 
     const minDate = new Date();
-    minDate.setDate(minDate.getDate() + 1); // Earliest pick-up is tomorrow
+    minDate.setDate(minDate.getDate() + 1); 
 
     return (
-        <Grid container spacing={2}>
+        <Grid container spacing={3}>
             <Grid item xs={12}>
-               <Button 
-                 startIcon={<CalendarMonthIcon />} 
-                 variant="outlined" 
-                 onClick={onCheckAvailability}
-                 sx={{ mb: 2 }}
-               >
-                 Check Availability Calendar
-               </Button>
+               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, p: 2, bgcolor: 'primary.light', borderRadius: 2, color: 'primary.contrastText' }}>
+                   <CalendarMonthIcon sx={{ mr: 2 }} />
+                   <Typography variant="body2" sx={{ flexGrow: 1 }}>Check availability before selecting a date to ensure items are in stock.</Typography>
+                   <Button 
+                     variant="contained" 
+                     color="secondary"
+                     onClick={onCheckAvailability}
+                     size="small"
+                   >
+                     Check Calendar
+                   </Button>
+               </Box>
             </Grid>
             <Grid item xs={12} sm={6}>
                 <DatePicker 
                     label="Pick-up Date" 
                     value={reservationDate} 
                     onChange={(d) => setReservationDate(d)} 
-                    renderInput={(params) => <TextField {...params} fullWidth required placeholder="Pick Date" />}
+                    renderInput={(params) => <TextField {...params} fullWidth required />}
                     minDate={minDate}
                     maxDate={maxDate}
+                    slotProps={{ textField: { fullWidth: true, required: true } }}
                 />
             </Grid>
             <Grid item xs={12} sm={6}>
                 <FormControl fullWidth required>
+                    <InputLabel>Time Slot</InputLabel>
                     <Select 
                         value={timeSlot} 
+                        label="Time Slot"
                         onChange={(e) => setTimeSlot(e.target.value)} 
-                        displayEmpty
                     >
-                        <MenuItem value="" disabled>Pick Time Slot</MenuItem>
                         <MenuItem value="morning">Morning (7am-2pm)</MenuItem>
                         <MenuItem value="afternoon">Afternoon (3pm-9pm)</MenuItem>
                         <MenuItem value="fullday">Full Day (7am-9pm)</MenuItem>
                     </Select>
                 </FormControl>
             </Grid>
-            <Grid item xs={12}><TextField fullWidth required multiline rows={4} label="Reason for Borrowing" value={reason} onChange={(e) => setReason(e.target.value)}/></Grid>
+            <Grid item xs={12}><TextField fullWidth required multiline rows={4} label="Reason for Borrowing" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="E.g., Birthday party, Community meeting..."/></Grid>
         </Grid>
     );
 };
 
 const Step3AddEquipment = ({ allEquipment, currentItemId, setCurrentItemId, currentQuantity, setCurrentQuantity, handleAddToCart, availableStockHint, cart, setCart }) => (
   <Box>
-    <Grid container spacing={2} alignItems="center">
-        <Grid item xs={12} sm={8}>
-            <FormControl fullWidth required>
-                <Select 
-                    value={currentItemId} 
-                    onChange={e => setCurrentItemId(e.target.value)} 
-                    displayEmpty
-                >
-                    <MenuItem value="" disabled>Select Equipment</MenuItem>
-                    {allEquipment.map((e) => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
-                </Select>
-            </FormControl>
+    <Paper elevation={0} variant="outlined" sx={{ p: 3, mb: 3, bgcolor: 'grey.50' }}>
+        <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} sm={6}>
+                <FormControl fullWidth required size="small">
+                    <InputLabel>Select Equipment</InputLabel>
+                    <Select 
+                        value={currentItemId} 
+                        label="Select Equipment"
+                        onChange={e => setCurrentItemId(e.target.value)} 
+                    >
+                        {allEquipment.map((e) => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
+                    </Select>
+                </FormControl>
+            </Grid>
+            <Grid item xs={6} sm={3}><TextField label="Qty" type="number" size="small" value={currentQuantity} onChange={e => setCurrentQuantity(e.target.value)} fullWidth InputProps={{ inputProps: { min: 1 } }} required/></Grid>
+            <Grid item xs={6} sm={3}><Button variant="contained" startIcon={<AddCircleIcon />} onClick={handleAddToCart} fullWidth>Add</Button></Grid>
+            {currentItemId && <Grid item xs={12}><Typography variant="caption" color="text.secondary">({availableStockHint} available for this date/slot)</Typography></Grid>}
         </Grid>
-        <Grid item xs={6} sm={2}><TextField label="Qty" type="number" value={currentQuantity} onChange={e => setCurrentQuantity(e.target.value)} fullWidth InputProps={{ inputProps: { min: 1 } }} required/></Grid>
-        <Grid item xs={6} sm={2}><Button variant="contained" color="primary" onClick={handleAddToCart} fullWidth sx={{height: '56px'}}>Add</Button></Grid>
-        {currentItemId && <Grid item xs={12}><Typography variant="caption">({availableStockHint} available for this date/slot)</Typography></Grid>}
-    </Grid>
-    {cart.length > 0 && <TableContainer component={Paper} variant="outlined" sx={{mt:2}}><Table size="small"><TableHead><TableRow><TableCell>Item</TableCell><TableCell align="right">Qty</TableCell><TableCell align="right">Actions</TableCell></TableRow></TableHead><TableBody>{cart.map(item => (<TableRow key={item.id}><TableCell>{item.name}</TableCell><TableCell align="right">{item.quantity}</TableCell><TableCell align="right"><IconButton size="small" onClick={() => setCart(p => p.filter(i => i.id !== item.id))}><DeleteIcon/></IconButton></TableCell></TableRow>))}</TableBody></Table></TableContainer>}
+    </Paper>
+    
+    <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>Requested Items:</Typography>
+    {cart.length > 0 ? (
+        <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+                <TableHead sx={{ bgcolor: 'grey.100' }}>
+                    <TableRow>
+                        <TableCell>Item</TableCell>
+                        <TableCell align="right">Qty</TableCell>
+                        <TableCell align="right">Action</TableCell>
+                    </TableRow>
+                </TableHead>
+                <TableBody>
+                    {cart.map(item => (
+                        <TableRow key={item.id}>
+                            <TableCell>{item.name}</TableCell>
+                            <TableCell align="right">{item.quantity}</TableCell>
+                            <TableCell align="right">
+                                <IconButton size="small" color="error" onClick={() => setCart(p => p.filter(i => i.id !== item.id))}><DeleteIcon/></IconButton>
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </TableContainer>
+    ) : (
+        <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 3 }}>No items added yet.</Typography>
+    )}
   </Box>
 );
 
 const Step4UploadDocs = ({ handleFileChange, idPreview, selfiePreview }) => (
-    <Grid container spacing={2}>
+    <Grid container spacing={3}>
         <Grid item xs={12} sm={6}>
-            <Typography gutterBottom>Upload ID Card <span style={{color: 'red'}}>*</span></Typography>
-            <Button variant="outlined" component="label" fullWidth>
-                Choose File
-                <input type="file" accept="image/*" hidden onChange={(e) => handleFileChange(e, 'id')} required />
-            </Button>
-            {idPreview && <Box component="img" src={idPreview} sx={{width: '100%', maxWidth: 100, height: 'auto', mt: 1, borderRadius: 1}} />}
+            <Paper variant="outlined" sx={{ p: 3, textAlign: 'center', borderStyle: 'dashed' }}>
+                <Typography gutterBottom fontWeight="bold">Upload ID Card <span style={{color: 'red'}}>*</span></Typography>
+                <Button variant="outlined" component="label" startIcon={<CloudUploadIcon />}>
+                    Select File
+                    <input type="file" accept="image/*" hidden onChange={(e) => handleFileChange(e, 'id')} required />
+                </Button>
+                {idPreview && <Box component="img" src={idPreview} sx={{display: 'block', mx: 'auto', mt: 2, maxHeight: 150, maxWidth: '100%', borderRadius: 1}} />}
+            </Paper>
         </Grid>
         <Grid item xs={12} sm={6}>
-            <Typography gutterBottom>Upload Selfie with ID <span style={{color: 'red'}}>*</span></Typography>
-            <Button variant="outlined" component="label" fullWidth>
-                Choose File
-                <input type="file" accept="image/*" hidden onChange={(e) => handleFileChange(e, 'selfie')} required />
-            </Button>
-            {selfiePreview && <Box component="img" src={selfiePreview} sx={{width: '100%', maxWidth: 100, height: 'auto', mt: 1, borderRadius: 1}} />}
+            <Paper variant="outlined" sx={{ p: 3, textAlign: 'center', borderStyle: 'dashed' }}>
+                <Typography gutterBottom fontWeight="bold">Selfie with ID <span style={{color: 'red'}}>*</span></Typography>
+                <Button variant="outlined" component="label" startIcon={<CloudUploadIcon />}>
+                    Select File
+                    <input type="file" accept="image/*" hidden onChange={(e) => handleFileChange(e, 'selfie')} required />
+                </Button>
+                {selfiePreview && <Box component="img" src={selfiePreview} sx={{display: 'block', mx: 'auto', mt: 2, maxHeight: 150, maxWidth: '100%', borderRadius: 1}} />}
+            </Paper>
         </Grid>
     </Grid>
 );
 
 const Step5Review = ({ requestorInfo, reservationDate, timeSlot, reason, cart, idPreview, selfiePreview }) => (
-    <Box>
-        <Typography variant="h6">Review Your Request</Typography>
-        <List dense>
-            <ListItem><ListItemText primary="Name" secondary={requestorInfo.fullName} /></ListItem>
-            <ListItem><ListItemText primary="Address" secondary={requestorInfo.address} /></ListItem>
-            <ListItem><ListItemText primary="Phone" secondary={requestorInfo.phoneNumber} /></ListItem>
-            <ListItem><ListItemText primary="Date" secondary={reservationDate ? reservationDate.toLocaleDateString() : 'N/A'} /></ListItem>
-            <ListItem><ListItemText primary="Time Slot" secondary={<span style={{textTransform: 'capitalize'}}>{timeSlot || 'N/A'}</span>} /></ListItem>
-            <ListItem><ListItemText primary="Reason" secondary={reason} /></ListItem>
-        </List>
-        <Typography variant="subtitle1" sx={{mt:1}}>Items:</Typography>
-        <List dense>{cart.map(i => <ListItemText key={i.id} primary={`${i.name} (x${i.quantity})`}/>)}</List>
-        <Typography variant="subtitle1" sx={{mt:1}}>Documents:</Typography>
+    <Paper elevation={0} variant="outlined" sx={{ p: 3 }}>
+        <Typography variant="h6" gutterBottom color="primary">Summary of Request</Typography>
+        <Divider sx={{ mb: 2 }} />
         <Grid container spacing={2}>
-            {idPreview && <Grid item xs={6}><Box component="img" src={idPreview} sx={{width: '100%', maxWidth: 100, height: 'auto', borderRadius: 1}} /></Grid>}
-            {selfiePreview && <Grid item xs={6}><Box component="img" src={selfiePreview} sx={{width: '100%', maxWidth: 100, height: 'auto', borderRadius: 1}} /></Grid>}
+            <Grid item xs={12} sm={6}>
+                <Typography variant="subtitle2" color="text.secondary">Borrower</Typography>
+                <Typography variant="body1" fontWeight="medium">{requestorInfo.fullName}</Typography>
+                <Typography variant="body2">{requestorInfo.address}</Typography>
+                <Typography variant="body2">{requestorInfo.phoneNumber}</Typography>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+                <Typography variant="subtitle2" color="text.secondary">Schedule</Typography>
+                <Typography variant="body1" fontWeight="medium">{reservationDate ? reservationDate.toLocaleDateString() : 'N/A'}</Typography>
+                <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>{timeSlot || 'N/A'}</Typography>
+            </Grid>
+            <Grid item xs={12}>
+                <Typography variant="subtitle2" color="text.secondary">Reason</Typography>
+                <Typography variant="body2">{reason}</Typography>
+            </Grid>
         </Grid>
-    </Box>
+        
+        <Divider sx={{ my: 2 }} />
+        <Typography variant="subtitle2" gutterBottom color="text.secondary">Items Requested</Typography>
+        {cart.map(i => (
+             <Box key={i.id} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                 <Typography variant="body2">{i.name}</Typography>
+                 <Typography variant="body2" fontWeight="bold">x{i.quantity}</Typography>
+             </Box>
+        ))}
+    </Paper>
 );
 
 function BorrowEquipment() {
   const { currentUser } = useAuth();
   const { showSnackbar } = useSnackbar();
+  const theme = useTheme();
+  
   const [modalOpen, setModalOpen] = useState(false);
-  const [availabilityModalOpen, setAvailabilityModalOpen] = useState(false); // New state for availability modal
+  const [availabilityModalOpen, setAvailabilityModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [allEquipment, setAllEquipment] = useState([]);
   const [allReservations, setAllReservations] = useState([]);
@@ -245,8 +303,9 @@ function BorrowEquipment() {
     setRequestorInfo(prev => ({...prev, [e.target.name]: e.target.value}));
   };
 
-  const isStepValid = () => {
-    switch (activeStep) {
+  const isStepValid = (step) => {
+    const s = step !== undefined ? step : activeStep;
+    switch (s) {
         case 0: return !!requestorInfo.fullName && !!requestorInfo.address && !!requestorInfo.phoneNumber;
         case 1: return !!reservationDate && !!timeSlot && !!reason;
         case 2: return cart.length > 0;
@@ -301,39 +360,107 @@ function BorrowEquipment() {
   };
 
   const steps = [
-    { label: 'Borrower Information', content: <Step1BorrowerInfo {...{requestorInfo, handleInfoChange}} /> },
+    { label: 'Borrower Info', content: <Step1BorrowerInfo {...{requestorInfo, handleInfoChange}} /> },
     { 
         label: 'Request Details', 
         content: <Step2RequestDetails 
             {...{reservationDate, setReservationDate, timeSlot, setTimeSlot, reason, setReason}} 
-            onCheckAvailability={() => setAvailabilityModalOpen(true)} // Pass handler
+            onCheckAvailability={() => setAvailabilityModalOpen(true)}
         /> 
     },
-    { label: 'Add Equipment', content: <Step3AddEquipment {...{allEquipment, currentItemId, setCurrentItemId, currentQuantity, setCurrentQuantity, handleAddToCart, availableStockHint, cart, setCart}} /> },
+    { label: 'Select Equipment', content: <Step3AddEquipment {...{allEquipment, currentItemId, setCurrentItemId, currentQuantity, setCurrentQuantity, handleAddToCart, availableStockHint, cart, setCart}} /> },
     { label: 'Upload Documents', content: <Step4UploadDocs {...{handleFileChange, idPreview, selfiePreview}} /> },
-    { label: 'Review & Submit', content: <Step5Review {...{requestorInfo, reservationDate, timeSlot, reason, cart, idPreview, selfiePreview}} /> },
+    { label: 'Confirm', content: <Step5Review {...{requestorInfo, reservationDate, timeSlot, reason, cart, idPreview, selfiePreview}} /> },
   ];
 
   return (
     <>
-      <Card><CardContent sx={{ textAlign: 'center', p: 5 }}><Typography variant="h5" gutterBottom>Create a New Borrowing Request</Typography><Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>Request one or more items for a specific date and time slot.</Typography><Button variant="contained" size="large" onClick={() => setModalOpen(true)} disabled={loading}>Create Request</Button></CardContent></Card>
+      <Box sx={{ mt: 4, mb: 4 }}>
+          <Typography variant="h4" fontWeight="bold" gutterBottom>Borrow Equipment</Typography>
+          <Typography variant="subtitle1" color="text.secondary">Follow the steps to submit a new equipment request.</Typography>
+      </Box>
+
+      <Card sx={{ maxWidth: 800, mx: 'auto', textAlign: 'center', py: 8, px: 4, borderRadius: 4, boxShadow: theme.shadows[4] }}>
+          <CardContent>
+              <Box sx={{ mb: 4, display: 'flex', justifyContent: 'center' }}>
+                  <AddCircleIcon sx={{ fontSize: 80, color: 'primary.light' }} />
+              </Box>
+              <Typography variant="h5" gutterBottom fontWeight="bold">Ready to Borrow?</Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 500, mx: 'auto' }}>
+                  Start a new request application. You'll need to provide your details, select items, and upload verification documents.
+              </Typography>
+              <Button 
+                variant="contained" 
+                size="large" 
+                onClick={() => setModalOpen(true)} 
+                disabled={loading}
+                sx={{ borderRadius: 50, px: 6, py: 1.5, fontSize: '1.1rem' }}
+              >
+                Start New Request
+              </Button>
+          </CardContent>
+      </Card>
       
       {/* Main Borrowing Flow Modal */}
       <Modal open={modalOpen} onClose={handleCloseModal} closeAfterTransition BackdropComponent={Backdrop} BackdropProps={{ timeout: 500 }}>
-        <Fade in={modalOpen}><Box sx={style}><Typography variant="h5" component="h2" sx={{ mb: 2 }}>New Borrowing Request</Typography>
-          <Stepper activeStep={activeStep} orientation="vertical">
-            {steps.map((step, index) => (<Step key={step.label}><StepLabel>{step.label}</StepLabel><StepContent><Box sx={{py: 2}}>{step.content}</Box><Box sx={{ mb: 2 }}><div>
-              <Button variant="contained" onClick={() => setActiveStep(p => p + 1)} sx={{ mt: 1, mr: 1 }} disabled={!isStepValid(activeStep)}>
-                {index === steps.length - 1 ? 'Submit' : 'Continue'}
-              </Button>
-              <Button disabled={index === 0} onClick={() => setActiveStep(p => p - 1)} sx={{ mt: 1, mr: 1 }}>Back</Button>
-            </div></Box></StepContent></Step>))}
-          </Stepper>
-          {activeStep === steps.length && (<Paper square elevation={0} sx={{ p: 3 }}><Typography>All steps completed - you're ready to submit.</Typography>
-            <Button onClick={handleSubmitRequest} sx={{ mt: 1, mr: 1 }} variant="contained" color="success" disabled={uploading}>{uploading ? <CircularProgress size={24} /> : 'Submit Final Request'}</Button>
-            <Button onClick={() => setActiveStep(0)} sx={{ mt: 1, mr: 1 }}>Reset</Button>
-          </Paper>)}
-        </Box></Fade>
+        <Fade in={modalOpen}>
+            <Box sx={style}>
+                {/* Header */}
+                <Box sx={{ p: 3, borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'primary.main', color: 'white', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
+                   <Typography variant="h6" fontWeight="bold">New Borrowing Request</Typography>
+                </Box>
+
+                {/* Content */}
+                <Box sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, overflowY: 'auto' }}>
+                    <Box sx={{ p: 3 }}>
+                        <Stepper activeStep={activeStep} alternativeLabel>
+                            {steps.map((step) => (
+                            <Step key={step.label}>
+                                <StepLabel>{step.label}</StepLabel>
+                            </Step>
+                            ))}
+                        </Stepper>
+                    </Box>
+                    
+                    <Box sx={{ p: 4, flexGrow: 1 }}>
+                        {steps[activeStep].content}
+                    </Box>
+                </Box>
+
+                {/* Footer Actions */}
+                <Box sx={{ p: 3, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'grey.50', display: 'flex', justifyContent: 'space-between', borderBottomLeftRadius: 12, borderBottomRightRadius: 12 }}>
+                    <Button 
+                        disabled={activeStep === 0} 
+                        onClick={() => setActiveStep(p => p - 1)}
+                        startIcon={<ArrowBackIcon />}
+                    >
+                        Back
+                    </Button>
+                    <Box>
+                        {activeStep === steps.length - 1 ? (
+                            <Button 
+                                onClick={handleSubmitRequest} 
+                                variant="contained" 
+                                color="success" 
+                                disabled={uploading}
+                                size="large"
+                            >
+                                {uploading ? <CircularProgress size={24} color="inherit" /> : 'Submit Request'}
+                            </Button>
+                        ) : (
+                            <Button 
+                                variant="contained" 
+                                onClick={() => setActiveStep(p => p + 1)} 
+                                disabled={!isStepValid(activeStep)}
+                                endIcon={<ArrowForwardIcon />}
+                            >
+                                Continue
+                            </Button>
+                        )}
+                    </Box>
+                </Box>
+            </Box>
+        </Fade>
       </Modal>
 
       {/* Availability Calendar Modal */}
@@ -341,7 +468,7 @@ function BorrowEquipment() {
          <Fade in={availabilityModalOpen}>
              <Box sx={calendarModalStyle}>
                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h5">Check Equipment Availability</Typography>
+                    <Typography variant="h5" fontWeight="bold">Equipment Availability</Typography>
                     <Button onClick={() => setAvailabilityModalOpen(false)}>Close</Button>
                  </Box>
                  <AvailabilityCalendar allEquipment={allEquipment} allReservations={allReservations} />
