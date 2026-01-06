@@ -14,6 +14,8 @@ import { useAuth } from '../context/AuthContextDef';
 import { useSnackbar } from '../context/SnackbarContextDef';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import DeleteIcon from '@mui/icons-material/Delete';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import AvailabilityCalendar from '../components/AvailabilityCalendar';
 
 const style = {
   position: 'absolute',
@@ -29,6 +31,11 @@ const style = {
   overflowY: 'auto',
 };
 
+const calendarModalStyle = {
+  ...style,
+  width: { xs: '95%', md: 900 },
+};
+
 // --- Step Content Components ---
 const Step1BorrowerInfo = ({ requestorInfo, handleInfoChange }) => (
   <Grid container spacing={2}>
@@ -38,7 +45,7 @@ const Step1BorrowerInfo = ({ requestorInfo, handleInfoChange }) => (
   </Grid>
 );
 
-const Step2RequestDetails = ({ reservationDate, setReservationDate, timeSlot, setTimeSlot, reason, setReason }) => {
+const Step2RequestDetails = ({ reservationDate, setReservationDate, timeSlot, setTimeSlot, reason, setReason, onCheckAvailability }) => {
     const maxDate = new Date();
     maxDate.setDate(maxDate.getDate() + 30); // 30 days from today
 
@@ -47,6 +54,16 @@ const Step2RequestDetails = ({ reservationDate, setReservationDate, timeSlot, se
 
     return (
         <Grid container spacing={2}>
+            <Grid item xs={12}>
+               <Button 
+                 startIcon={<CalendarMonthIcon />} 
+                 variant="outlined" 
+                 onClick={onCheckAvailability}
+                 sx={{ mb: 2 }}
+               >
+                 Check Availability Calendar
+               </Button>
+            </Grid>
             <Grid item xs={12} sm={6}>
                 <DatePicker 
                     label="Pick-up Date" 
@@ -145,6 +162,7 @@ function BorrowEquipment() {
   const { currentUser } = useAuth();
   const { showSnackbar } = useSnackbar();
   const [modalOpen, setModalOpen] = useState(false);
+  const [availabilityModalOpen, setAvailabilityModalOpen] = useState(false); // New state for availability modal
   const [loading, setLoading] = useState(true);
   const [allEquipment, setAllEquipment] = useState([]);
   const [allReservations, setAllReservations] = useState([]);
@@ -153,8 +171,8 @@ function BorrowEquipment() {
   const [cart, setCart] = useState([]);
   const [currentItemId, setCurrentItemId] = useState('');
   const [currentQuantity, setCurrentQuantity] = useState(1);
-  const [reservationDate, setReservationDate] = useState(null); // Changed initial state to null
-  const [timeSlot, setTimeSlot] = useState(''); // Changed initial state to empty string
+  const [reservationDate, setReservationDate] = useState(null); 
+  const [timeSlot, setTimeSlot] = useState(''); 
   const [reason, setReason] = useState('');
   const [idFile, setIdFile] = useState(null);
   const [selfieFile, setSelfieFile] = useState(null);
@@ -192,7 +210,7 @@ function BorrowEquipment() {
   useEffect(() => { fetchPrerequisites(); }, [fetchPrerequisites]);
 
   const availableStockHint = useMemo(() => {
-    if (!currentItemId || !reservationDate || !timeSlot) return 0; // Added check for reservationDate and timeSlot
+    if (!currentItemId || !reservationDate || !timeSlot) return 0;
     const equipment = allEquipment.find(e => e.id === currentItemId);
     const stock = equipment?.totalStock || 0;
     const reservationsForThisItem = allReservations.filter(r => Array.isArray(r.items) && r.items.some(i => i.id === currentItemId) && r.reservationDate.toDate().toDateString() === reservationDate.toDateString());
@@ -230,7 +248,7 @@ function BorrowEquipment() {
   const isStepValid = () => {
     switch (activeStep) {
         case 0: return !!requestorInfo.fullName && !!requestorInfo.address && !!requestorInfo.phoneNumber;
-        case 1: return !!reservationDate && !!timeSlot && !!reason; // Added check for reservationDate and timeSlot
+        case 1: return !!reservationDate && !!timeSlot && !!reason;
         case 2: return cart.length > 0;
         case 3: return !!idFile && !!selfieFile;
         default: return true;
@@ -278,13 +296,19 @@ function BorrowEquipment() {
   const handleCloseModal = () => {
     setModalOpen(false); setActiveStep(0); setCart([]); setReason('');
     setIdFile(null); setSelfieFile(null); setIdPreview(''); setSelfiePreview('');
-    setReservationDate(null); // Reset date
-    setTimeSlot(''); // Reset time slot
+    setReservationDate(null);
+    setTimeSlot('');
   };
 
   const steps = [
     { label: 'Borrower Information', content: <Step1BorrowerInfo {...{requestorInfo, handleInfoChange}} /> },
-    { label: 'Request Details', content: <Step2RequestDetails {...{reservationDate, setReservationDate, timeSlot, setTimeSlot, reason, setReason}} /> },
+    { 
+        label: 'Request Details', 
+        content: <Step2RequestDetails 
+            {...{reservationDate, setReservationDate, timeSlot, setTimeSlot, reason, setReason}} 
+            onCheckAvailability={() => setAvailabilityModalOpen(true)} // Pass handler
+        /> 
+    },
     { label: 'Add Equipment', content: <Step3AddEquipment {...{allEquipment, currentItemId, setCurrentItemId, currentQuantity, setCurrentQuantity, handleAddToCart, availableStockHint, cart, setCart}} /> },
     { label: 'Upload Documents', content: <Step4UploadDocs {...{handleFileChange, idPreview, selfiePreview}} /> },
     { label: 'Review & Submit', content: <Step5Review {...{requestorInfo, reservationDate, timeSlot, reason, cart, idPreview, selfiePreview}} /> },
@@ -293,6 +317,8 @@ function BorrowEquipment() {
   return (
     <>
       <Card><CardContent sx={{ textAlign: 'center', p: 5 }}><Typography variant="h5" gutterBottom>Create a New Borrowing Request</Typography><Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>Request one or more items for a specific date and time slot.</Typography><Button variant="contained" size="large" onClick={() => setModalOpen(true)} disabled={loading}>Create Request</Button></CardContent></Card>
+      
+      {/* Main Borrowing Flow Modal */}
       <Modal open={modalOpen} onClose={handleCloseModal} closeAfterTransition BackdropComponent={Backdrop} BackdropProps={{ timeout: 500 }}>
         <Fade in={modalOpen}><Box sx={style}><Typography variant="h5" component="h2" sx={{ mb: 2 }}>New Borrowing Request</Typography>
           <Stepper activeStep={activeStep} orientation="vertical">
@@ -308,6 +334,19 @@ function BorrowEquipment() {
             <Button onClick={() => setActiveStep(0)} sx={{ mt: 1, mr: 1 }}>Reset</Button>
           </Paper>)}
         </Box></Fade>
+      </Modal>
+
+      {/* Availability Calendar Modal */}
+      <Modal open={availabilityModalOpen} onClose={() => setAvailabilityModalOpen(false)} closeAfterTransition BackdropComponent={Backdrop} BackdropProps={{ timeout: 500 }}>
+         <Fade in={availabilityModalOpen}>
+             <Box sx={calendarModalStyle}>
+                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h5">Check Equipment Availability</Typography>
+                    <Button onClick={() => setAvailabilityModalOpen(false)}>Close</Button>
+                 </Box>
+                 <AvailabilityCalendar allEquipment={allEquipment} allReservations={allReservations} />
+             </Box>
+         </Fade>
       </Modal>
     </>
   );

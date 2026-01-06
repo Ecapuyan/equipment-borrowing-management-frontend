@@ -2,11 +2,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Typography, Box, CircularProgress, Card, CardContent, Chip, Button,
-  Modal, Fade, Backdrop, Grid, Divider, List, ListItem, ListItemText, Paper, Link
+  Modal, Fade, Backdrop, Grid, Divider, List, ListItem, ListItemText, Paper, Link,
+  FormControlLabel, Switch, TextField, Select, MenuItem, FormControl, InputLabel
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import { db } from '../firebase';
-import { collection, getDocs, doc, updateDoc, query, where } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, query, where, addDoc, Timestamp } from 'firebase/firestore';
 import { useSnackbar } from '../context/SnackbarContextDef';
 
 const modalStyle = {
@@ -23,13 +24,30 @@ const modalStyle = {
   overflowY: 'auto'
 };
 
+const returnModalStyle = {
+  ...modalStyle,
+  width: { xs: '90%', sm: 600 },
+};
+
 function ManageReservations() {
   const [reservations, setReservations] = useState([]);
   const [equipments, setEquipments] = useState([]);
   const [loading, setLoading] = useState(true);
   const { showSnackbar } = useSnackbar();
+  
+  // Detail Modal State
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState(null);
+
+  // Return/Incident Modal State
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [returnIssue, setReturnIssue] = useState({
+    hasIssue: false,
+    itemId: '',
+    type: 'damaged',
+    description: '',
+    cost: ''
+  });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -58,6 +76,56 @@ function ManageReservations() {
   const handleCloseModal = () => {
     setModalOpen(false);
     setSelectedReservation(null);
+  };
+
+  const handleOpenReturnModal = () => {
+    setReturnIssue({ hasIssue: false, itemId: '', type: 'damaged', description: '', cost: '' });
+    setReturnModalOpen(true);
+  };
+
+  const handleReturnSubmit = async () => {
+    if (!selectedReservation) return;
+
+    try {
+      // 1. If there's an issue, report it
+      if (returnIssue.hasIssue) {
+        if (!returnIssue.itemId || !returnIssue.description) {
+            showSnackbar("Please select the item and describe the issue.", "warning");
+            return;
+        }
+        
+        const affectedItem = selectedReservation.items.find(i => i.id === returnIssue.itemId);
+
+        await addDoc(collection(db, 'incident_reports'), {
+            reservationId: selectedReservation.id,
+            residentName: selectedReservation.fullName,
+            residentId: selectedReservation.userId,
+            equipmentId: returnIssue.itemId,
+            equipmentName: affectedItem?.name || 'Unknown Item',
+            type: returnIssue.type,
+            description: returnIssue.description,
+            cost: returnIssue.cost || 0,
+            status: 'open',
+            dateReported: Timestamp.now()
+        });
+      }
+
+      // 2. Mark reservation as returned
+      await updateDoc(doc(db, 'reservations', selectedReservation.id), { 
+          status: 'returned',
+          returnDate: Timestamp.now(),
+          hasIncident: returnIssue.hasIssue 
+      });
+
+      showSnackbar(`Reservation marked as returned${returnIssue.hasIssue ? ' with incident report' : ''}.`, 'success');
+      fetchData();
+      setReturnModalOpen(false);
+      handleCloseModal(); // Close the main details modal too
+
+    } catch (err) {
+      console.error("Error processing return:", err);
+      showSnackbar("Failed to process return.", "error");
+    }
   };
 
   const handleStatusUpdate = async (reservation, newStatus) => {
@@ -140,6 +208,7 @@ function ManageReservations() {
         </CardContent>
       </Card>
 
+      {/* Detail Modal */}
       <Modal open={modalOpen} onClose={handleCloseModal} closeAfterTransition BackdropComponent={Backdrop} BackdropProps={{ timeout: 500 }}>
         <Fade in={modalOpen}>
           <Box sx={modalStyle}>
@@ -173,11 +242,78 @@ function ManageReservations() {
                       <Button onClick={() => handleStatusUpdate(selectedReservation, 'rejected')} variant="contained" color="error">Reject Request</Button>
                     </>
                   )}
-                  {selectedReservation.status === 'approved' && (<Button onClick={() => handleStatusUpdate(selectedReservation, 'returned')} variant="contained">Mark as Returned</Button>)}
+                  {selectedReservation.status === 'approved' && (<Button onClick={handleOpenReturnModal} variant="contained">Mark as Returned</Button>)}
                 </Box>
               </Box>
             )}
           </Box>
+        </Fade>
+      </Modal>
+
+      {/* Return Inspection Modal */}
+      <Modal open={returnModalOpen} onClose={() => setReturnModalOpen(false)} closeAfterTransition BackdropComponent={Backdrop} BackdropProps={{ timeout: 500 }}>
+        <Fade in={returnModalOpen}>
+            <Box sx={returnModalStyle}>
+                <Typography variant="h5" gutterBottom>Return Inspection</Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>Check the condition of the returned items.</Typography>
+                
+                <FormControlLabel 
+                    control={<Switch checked={returnIssue.hasIssue} onChange={(e) => setReturnIssue(p => ({...p, hasIssue: e.target.checked}))} />} 
+                    label="Report Damages or Missing Items" 
+                />
+
+                {returnIssue.hasIssue && (
+                    <Box sx={{ mt: 2, p: 2, bgcolor: '#fff0f0', borderRadius: 1 }}>
+                        <Typography variant="subtitle2" color="error" gutterBottom>Incident Details</Typography>
+                        <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                            <InputLabel>Affected Item</InputLabel>
+                            <Select 
+                                value={returnIssue.itemId} 
+                                label="Affected Item"
+                                onChange={(e) => setReturnIssue(p => ({...p, itemId: e.target.value}))}
+                            >
+                                {selectedReservation?.items?.map(item => (
+                                    <MenuItem key={item.id} value={item.id}>{item.name}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                        <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                            <InputLabel>Issue Type</InputLabel>
+                            <Select 
+                                value={returnIssue.type} 
+                                label="Issue Type"
+                                onChange={(e) => setReturnIssue(p => ({...p, type: e.target.value}))}
+                            >
+                                <MenuItem value="damaged">Damaged</MenuItem>
+                                <MenuItem value="lost">Lost</MenuItem>
+                            </Select>
+                        </FormControl>
+                        <TextField 
+                            fullWidth 
+                            multiline 
+                            rows={3} 
+                            label="Description of Damage/Loss" 
+                            size="small" 
+                            sx={{ mb: 2 }} 
+                            value={returnIssue.description}
+                            onChange={(e) => setReturnIssue(p => ({...p, description: e.target.value}))}
+                        />
+                         <TextField 
+                            fullWidth 
+                            type="number" 
+                            label="Estimated Cost (PHP)" 
+                            size="small" 
+                            value={returnIssue.cost}
+                            onChange={(e) => setReturnIssue(p => ({...p, cost: e.target.value}))}
+                        />
+                    </Box>
+                )}
+
+                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                    <Button onClick={() => setReturnModalOpen(false)}>Cancel</Button>
+                    <Button variant="contained" color="primary" onClick={handleReturnSubmit}>Confirm Return</Button>
+                </Box>
+            </Box>
         </Fade>
       </Modal>
     </>
