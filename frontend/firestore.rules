@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // USER COLLECTION RULES
+    match /users/{userId} {
+      // Allow users to read and write their own profile
+      // Allow any authenticated user to read profiles (needed for UserManagement list)
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+      // Allow staff to update roles (this is a simplified rule for dev)
+      allow update: if request.auth != null; 
+    }
+
+    // GENERAL RULES (Fallback for other collections like equipments, reservations)
+    // For development, we allow all authenticated users to read/write these collections.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

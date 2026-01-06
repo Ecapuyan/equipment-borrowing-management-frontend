@@ -1,0 +1,16 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Allow users to upload and read their own verification files
+    match /verifications/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // General rule: Allow authenticated users to read everything (e.g. equipment images)
+    // but only allow writing if specifically permitted above.
+    match /{allPaths=**} {
+      allow read: if request.auth != null;
+    }
+  }
+}

@@ -1,126 +1,161 @@
-import React, { useState, useEffect } from 'react';
-import axiosInstance from '../api/axios';
+// src/pages/MyReservations.jsx
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Container, Box, Typography, Table, TableBody, TableCell,
-    TableContainer, TableHead, TableRow, Paper, Chip, Alert,
-    Button, Dialog, DialogActions, DialogContent, DialogTitle
+  Typography, Box, CircularProgress, Button, Card, CardContent, Chip, Grid,
+  Modal, Fade, Backdrop, List, ListItem, ListItemText, Paper
 } from '@mui/material';
+import { db } from '../firebase';
+import { collection, query, where, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { useAuth } from '../context/AuthContextDef';
+import { useSnackbar } from '../context/SnackbarContextDef';
 
-const MyReservations = () => {
-    const [reservations, setReservations] = useState([]);
-    const [error, setError] = useState('');
-    const [open, setOpen] = useState(false);
-    const [selectedReservation, setSelectedReservation] = useState(null);
-    const [reservationItems, setReservationItems] = useState([]);
-
-    useEffect(() => {
-        axiosInstance.get('/reservations')
-        .then(res => {
-            setReservations(res.data.data);
-        })
-        .catch(err => {
-            setError('Failed to fetch reservations.');
-        });
-    }, []);
-
-    const handleView = (reservation) => {
-        setSelectedReservation(reservation);
-        axiosInstance.get(`/reservations/${reservation.id}/items`)
-            .then(res => {
-                setReservationItems(res.data.data);
-                setOpen(true);
-            })
-            .catch(err => {
-                setError('Failed to fetch reservation items.');
-            });
-    };
-
-    const handleClose = () => {
-        setOpen(false);
-        setSelectedReservation(null);
-        setReservationItems([]);
-    };
-
-    const getStatusChip = (status) => {
-        let color = 'default';
-        switch (status) {
-            case 'pending':
-                color = 'warning';
-                break;
-            case 'approved':
-                color = 'info';
-                break;
-            case 'picked_up':
-                color = 'primary';
-                break;
-            case 'returned':
-                color = 'success';
-                break;
-            case 'rejected':
-                color = 'error';
-                break;
-            default:
-                color = 'default';
-        }
-        return <Chip label={status} color={color} />;
-    };
-
-    return (
-        <Container component="main" maxWidth="md">
-            <Box sx={{ marginTop: 8 }}>
-                <Typography component="h1" variant="h4" gutterBottom>
-                    My Reservations
-                </Typography>
-                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-                <TableContainer component={Paper}>
-                    <Table>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>ID</TableCell>
-                                <TableCell>Occasion</TableCell>
-                                <TableCell>Status</TableCell>
-                                <TableCell>Reservation Date</TableCell>
-                                <TableCell align="right">Actions</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {reservations.map(reservation => (
-                                <TableRow key={reservation.id}>
-                                    <TableCell>{reservation.id}</TableCell>
-                                    <TableCell>{reservation.occasion}</TableCell>
-                                    <TableCell>{getStatusChip(reservation.status)}</TableCell>
-                                    <TableCell>{new Date(reservation.reservation_date).toLocaleDateString()}</TableCell>
-                                    <TableCell align="right">
-                                        <Button size="small" onClick={() => handleView(reservation)}>View</Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-                <Dialog open={open} onClose={handleClose}>
-                    <DialogTitle>Reservation Details</DialogTitle>
-                    <DialogContent>
-                        {selectedReservation && (
-                            <Box>
-                                <Typography><strong>ID:</strong> {selectedReservation.id}</Typography>
-                                <Typography><strong>Occasion:</strong> {selectedReservation.occasion}</Typography>
-                                <Typography><strong>Status:</strong> {selectedReservation.status}</Typography>
-                                <Typography><strong>Reservation Date:</strong> {new Date(selectedReservation.reservation_date).toLocaleDateString()}</Typography>
-                                <Typography sx={{ mt: 2 }}><strong>Items:</strong></Typography>
-                                {reservationItems.map(item => (
-                                    <Typography key={item.name}>{item.name} ({item.quantity})</Typography>
-                                ))}
-                            </Box>
-                        )}
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={handleClose}>Close</Button>
-                    </DialogActions>
-                </Dialog>
-            </Box>
-        </Container>
-    );
+const modalStyle = {
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  width: { xs: '90%', sm: '80%', md: 600 },
+  bgcolor: 'background.paper',
+  boxShadow: 24,
+  p: 4,
+  borderRadius: 2,
 };
+
+function MyReservations() {
+  const { currentUser } = useAuth();
+  const { showSnackbar } = useSnackbar();
+  const [reservations, setReservations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedReservation, setSelectedReservation] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const fetchReservations = useCallback(async () => {
+    if (!currentUser) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      const q = query(collection(db, 'reservations'), where('userId', '==', currentUser.uid));
+      const querySnapshot = await getDocs(q);
+      const fetchedReservations = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setReservations(fetchedReservations);
+    } catch (err) {
+      console.error("Error fetching reservations:", err);
+      showSnackbar("Failed to load your reservations.", 'error');
+    } finally { setLoading(false); }
+  }, [currentUser, showSnackbar]);
+
+  useEffect(() => {
+    fetchReservations();
+  }, [fetchReservations]);
+
+  const handleCancelReservation = async (reservationId) => {
+    if (!window.confirm("Are you sure you want to cancel this reservation?")) return;
+    try {
+      await deleteDoc(doc(db, 'reservations', reservationId));
+      showSnackbar('Reservation cancelled successfully!', 'success');
+      fetchReservations(); // Refresh the list
+    } catch (err) {
+      console.error("Error cancelling reservation:", err);
+      showSnackbar("Failed to cancel reservation.", 'error');
+    }
+  };
+
+  const handleOpenModal = (reservation) => {
+    setSelectedReservation(reservation);
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setSelectedReservation(null);
+  };
+
+  const renderStatusChip = (status) => {
+    let color = 'default';
+    if (status === 'pending') color = 'warning';
+    if (status === 'approved') color = 'success';
+    if (status === 'rejected') color = 'error';
+    if (status === 'completed') color = 'info';
+    if (status === 'cancelled') color = 'secondary';
+    return <Chip label={status} color={color} variant="outlined" sx={{ textTransform: 'capitalize' }} />;
+  };
+  
+  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}><CircularProgress /></Box>;
+  if (!currentUser) return <Typography variant="h5" color="error" align="center" sx={{ mt: 4 }}>Please log in to view your reservations.</Typography>;
+
+  return (
+    <>
+      <Typography variant="h4" component="h1" gutterBottom>My Reservations</Typography>
+      {reservations.length === 0 ? (
+        <Paper elevation={1} sx={{ p: 3, textAlign: 'center' }}>
+          <Typography variant="h6">No reservations found.</Typography>
+          <Typography>You have not made any equipment requests yet.</Typography>
+        </Paper>
+      ) : (
+        <Grid container spacing={3}>
+          {reservations.map(res => (
+            <Grid item xs={12} md={6} lg={4} key={res.id}>
+              <Card elevation={2}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Typography variant="h6" component="div" gutterBottom>
+                      Request on {res.requestDate?.toDate().toLocaleDateString()}
+                    </Typography>
+                    {renderStatusChip(res.status)}
+                  </Box>
+                  <Typography color="text.secondary" sx={{ mb: 1.5 }}>
+                    For pick-up on: <strong>{res.reservationDate?.toDate().toLocaleDateString()}</strong>
+                  </Typography>
+                  <List dense>
+                    {res.items?.slice(0, 3).map(item => (
+                      <ListItemText key={item.id} primary={`${item.name} (x${item.quantity})`} />
+                    ))}
+                    {res.items?.length > 3 && <ListItemText primary="..." />}
+                  </List>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                    <Button size="small" onClick={() => handleOpenModal(res)}>View Details</Button>
+                    {res.status === 'pending' && res.reservationDate && (res.reservationDate.toDate().getTime() - Date.now()) / (1000 * 60 * 60 * 24) > 7 && (
+                      <Button size="small" color="error" onClick={() => handleCancelReservation(res.id)}>Cancel</Button>
+                    )}
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      )}
+
+      <Modal open={modalOpen} onClose={handleCloseModal} closeAfterTransition BackdropComponent={Backdrop} BackdropProps={{ timeout: 500 }}>
+        <Fade in={modalOpen}>
+          <Box sx={modalStyle}>
+            {selectedReservation && (
+              <>
+                <Typography variant="h5" component="h2">Reservation Details</Typography>
+                {renderStatusChip(selectedReservation.status)}
+                <List sx={{ mt: 2 }}>
+                  <ListItem><ListItemText primary="Requestor" secondary={selectedReservation.fullName} /></ListItem>
+                  <ListItem><ListItemText primary="Pick-up Date" secondary={selectedReservation.reservationDate?.toDate().toLocaleString()} /></ListItem>
+                  <ListItem><ListItemText primary="Time Slot" secondary={selectedReservation.timeSlot} /></ListItem>
+                  <ListItem><ListItemText primary="Reason" secondary={selectedReservation.reason} /></ListItem>
+                  <ListItem>
+                    <ListItemText 
+                      primary="Items" 
+                      secondary={
+                        <ul style={{ paddingLeft: 20, margin: 0 }}>
+                          {selectedReservation.items?.map(i => <li key={i.id}>{`${i.name} (x${i.quantity})`}</li>)}
+                        </ul>
+                      } 
+                    />
+                  </ListItem>
+                  {selectedReservation.adminNotes && <ListItem><ListItemText primary="Admin Notes" secondary={selectedReservation.adminNotes}/></ListItem>}
+                </List>
+                <Button onClick={handleCloseModal} sx={{ mt: 2 }}>Close</Button>
+              </>
+            )}
+          </Box>
+        </Fade>
+      </Modal>
+    </>
+  );
+}
 
 export default MyReservations;

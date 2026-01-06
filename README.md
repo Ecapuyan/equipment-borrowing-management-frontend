@@ -11,15 +11,6 @@ A full-stack web application for managing equipment reservations with role-based
 - **Image Upload**: ID and selfie verification for reservations
 - **Reporting**: Reservation summaries and analytics
 
-## Tech Stack
-
-### Backend
-- Node.js & Express.js
-- MySQL Database
-- JWT Authentication
-- Multer for file uploads
-- CORS enabled
-
 ### Frontend
 - React.js
 - Material-UI (MUI)
