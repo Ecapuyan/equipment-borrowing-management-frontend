@@ -55,7 +55,7 @@ function ResidentDashboard() {
         </Typography>
       </Box>
 
-      <Grid container spacing={3}>
+      <Grid container spacing={2}>
         {dashboardItems.map((item) => (
           <Grid item xs={12} sm={6} md={4} key={item.title}>
             <Card 
@@ -64,21 +64,21 @@ function ResidentDashboard() {
                 transition: 'transform 0.2s, box-shadow 0.2s',
                 '&:hover': {
                   transform: 'translateY(-4px)',
-                  boxShadow: theme.shadows[8]
+                  boxShadow: theme.shadows[4]
                 }
               }}
             >
               <CardActionArea component={RouterLink} to={item.path} sx={{ height: '100%', p: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                   <Avatar variant="rounded" sx={{ background: item.color, width: 56, height: 56, boxShadow: 2 }}>
-                      {item.icon}
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+                   <Avatar variant="rounded" sx={{ background: item.color, width: 44, height: 44, boxShadow: 1 }}>
+                      {React.cloneElement(item.icon, { sx: { fontSize: 24, color: 'white' } })}
                    </Avatar>
                 </Box>
                 <CardContent sx={{ p: 0 }}>
-                    <Typography variant="h6" fontWeight="bold" gutterBottom>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
                         {item.title}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
                         {item.description}
                     </Typography>
                 </CardContent>

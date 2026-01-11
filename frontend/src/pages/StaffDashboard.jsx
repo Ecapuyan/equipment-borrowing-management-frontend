@@ -17,7 +17,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import BookOnlineIcon from '@mui/icons-material/BookOnline';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import { useAuth } from '../context/AuthContextDef';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import StaffCalendar from '../components/StaffCalendar';
 
@@ -42,6 +42,20 @@ function StaffDashboard() {
 
     fetchReservations();
   }, []);
+
+  const handleMarkDelivered = async (reservationId) => {
+    try {
+        await updateDoc(doc(db, 'reservations', reservationId), {
+            status: 'delivered'
+        });
+        // Update local state to reflect change immediately
+        setReservations(prev => prev.map(res => 
+            res.id === reservationId ? { ...res, status: 'delivered' } : res
+        ));
+    } catch (error) {
+        console.error("Error marking reservation as delivered:", error);
+    }
+  };
 
   const dashboardItems = [
     {
@@ -86,7 +100,7 @@ function StaffDashboard() {
       </Box>
       
       {/* Navigation Cards */}
-      <Grid container spacing={3} sx={{ mb: 5 }}>
+      <Grid container spacing={2} sx={{ mb: 4 }}>
         {dashboardItems.map((item) => (
           <Grid item xs={12} sm={6} lg={3} key={item.title}>
             <Card 
@@ -95,21 +109,21 @@ function StaffDashboard() {
                 transition: 'transform 0.2s, box-shadow 0.2s',
                 '&:hover': {
                   transform: 'translateY(-4px)',
-                  boxShadow: theme.shadows[8]
+                  boxShadow: theme.shadows[4]
                 }
               }}
             >
               <CardActionArea component={RouterLink} to={item.path} sx={{ height: '100%', p: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                   <Avatar variant="rounded" sx={{ background: item.color, width: 56, height: 56, boxShadow: 2 }}>
-                      {item.icon}
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+                   <Avatar variant="rounded" sx={{ background: item.color, width: 44, height: 44, boxShadow: 1 }}>
+                      {React.cloneElement(item.icon, { sx: { fontSize: 24, color: 'white' } })}
                    </Avatar>
                 </Box>
                 <CardContent sx={{ p: 0 }}>
-                    <Typography variant="h6" fontWeight="bold" gutterBottom>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
                         {item.title}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
                         {item.description}
                     </Typography>
                 </CardContent>
@@ -130,7 +144,7 @@ function StaffDashboard() {
       ) : (
         <Card sx={{ borderRadius: 2 }}>
             <CardContent sx={{ p: 3 }}>
-                <StaffCalendar reservations={reservations} />
+                <StaffCalendar reservations={reservations} onMarkDelivered={handleMarkDelivered} />
             </CardContent>
         </Card>
       )}

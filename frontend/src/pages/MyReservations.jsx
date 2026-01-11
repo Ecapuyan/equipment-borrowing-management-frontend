@@ -74,8 +74,8 @@ function MyReservations() {
     if (status === 'pending') color = 'warning';
     if (status === 'approved') color = 'success';
     if (status === 'rejected') color = 'error';
-    if (status === 'completed') color = 'info';
-    if (status === 'cancelled') color = 'secondary';
+    if (status === 'completed' || status === 'delivered') color = 'info';
+    if (status === 'cancelled' || status === 'returned') color = 'default';
     return <Chip label={status} color={color} variant="outlined" sx={{ textTransform: 'capitalize' }} />;
   };
   

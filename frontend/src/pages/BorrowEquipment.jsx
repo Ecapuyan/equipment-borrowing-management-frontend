@@ -380,13 +380,13 @@ function BorrowEquipment() {
           <Typography variant="subtitle1" color="text.secondary">Follow the steps to submit a new equipment request.</Typography>
       </Box>
 
-      <Card sx={{ maxWidth: 800, mx: 'auto', textAlign: 'center', py: 8, px: 4, borderRadius: 4, boxShadow: theme.shadows[4] }}>
+      <Card sx={{ maxWidth: 600, mx: 'auto', textAlign: 'center', py: 5, px: 4, borderRadius: 4, boxShadow: theme.shadows[2] }}>
           <CardContent>
-              <Box sx={{ mb: 4, display: 'flex', justifyContent: 'center' }}>
-                  <AddCircleIcon sx={{ fontSize: 80, color: 'primary.light' }} />
+              <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
+                  <AddCircleIcon sx={{ fontSize: 64, color: 'primary.light' }} />
               </Box>
               <Typography variant="h5" gutterBottom fontWeight="bold">Ready to Borrow?</Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 500, mx: 'auto' }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 4, maxWidth: 450, mx: 'auto' }}>
                   Start a new request application. You'll need to provide your details, select items, and upload verification documents.
               </Typography>
               <Button 
@@ -394,7 +394,7 @@ function BorrowEquipment() {
                 size="large" 
                 onClick={() => setModalOpen(true)} 
                 disabled={loading}
-                sx={{ borderRadius: 50, px: 6, py: 1.5, fontSize: '1.1rem' }}
+                sx={{ borderRadius: 50, px: 4, py: 1.2, fontSize: '1rem' }}
               >
                 Start New Request
               </Button>
@@ -404,25 +404,25 @@ function BorrowEquipment() {
       {/* Main Borrowing Flow Modal */}
       <Modal open={modalOpen} onClose={handleCloseModal} closeAfterTransition BackdropComponent={Backdrop} BackdropProps={{ timeout: 500 }}>
         <Fade in={modalOpen}>
-            <Box sx={style}>
+            <Box sx={{ ...style, width: { xs: '95%', md: 700 } }}>
                 {/* Header */}
-                <Box sx={{ p: 3, borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'primary.main', color: 'white', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
-                   <Typography variant="h6" fontWeight="bold">New Borrowing Request</Typography>
+                <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'primary.main', color: 'white', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
+                   <Typography variant="subtitle1" fontWeight="bold">New Borrowing Request</Typography>
                 </Box>
 
                 {/* Content */}
                 <Box sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, overflowY: 'auto' }}>
-                    <Box sx={{ p: 3 }}>
+                    <Box sx={{ p: 2 }}>
                         <Stepper activeStep={activeStep} alternativeLabel>
                             {steps.map((step) => (
                             <Step key={step.label}>
-                                <StepLabel>{step.label}</StepLabel>
+                                <StepLabel><Typography variant="caption">{step.label}</Typography></StepLabel>
                             </Step>
                             ))}
                         </Stepper>
                     </Box>
                     
-                    <Box sx={{ p: 4, flexGrow: 1 }}>
+                    <Box sx={{ p: 3, flexGrow: 1 }}>
                         {steps[activeStep].content}
                     </Box>
                 </Box>

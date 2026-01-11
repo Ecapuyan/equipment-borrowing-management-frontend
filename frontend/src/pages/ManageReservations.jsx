@@ -200,6 +200,7 @@ function ManageReservations() {
         let color = 'default';
         if (status === 'pending') color = 'warning';
         if (status === 'approved') color = 'success';
+        if (status === 'delivered') color = 'info';
         if (status === 'rejected' || status === 'cancelled' || status === 'returned') color = 'error';
         return (
             <Chip 
@@ -357,7 +358,7 @@ function ManageReservations() {
                         <Button onClick={() => handleStatusUpdate(selectedReservation, 'approved')} variant="contained" color="success">Approve</Button>
                     </>
                 )}
-                {selectedReservation && selectedReservation.status === 'approved' && (
+                {selectedReservation && (selectedReservation.status === 'approved' || selectedReservation.status === 'delivered') && (
                     <Button onClick={handleOpenReturnModal} variant="contained" startIcon={<AssignmentTurnedInIcon />}>
                         Mark Returned
                     </Button>

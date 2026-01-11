@@ -18,20 +18,28 @@ function UserManagement() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const { showSnackbar } = useSnackbar();
-  const usersCollectionRef = collection(db, 'users');
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
+    const timeout = setTimeout(() => {
+        setLoading(false);
+        showSnackbar("Request timed out. Please check your connection.", "error");
+    }, 10000); // 10s timeout safety
+
     try {
+      console.log("Fetching users...");
+      const usersCollectionRef = collection(db, 'users');
       const data = await getDocs(usersCollectionRef);
+      console.log("Users fetched:", data.docs.length);
       setUsers(data.docs.map((doc) => ({ ...doc.data(), id: doc.id })));
     } catch (err) {
       console.error("Error fetching users:", err);
-      showSnackbar("Failed to load users.", "error");
+      showSnackbar("Failed to load users: " + err.message, "error");
     } finally {
+      clearTimeout(timeout);
       setLoading(false);
     }
-  }, [usersCollectionRef, showSnackbar]);
+  }, [showSnackbar]);
 
   useEffect(() => {
     fetchUsers();
