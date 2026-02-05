@@ -57,7 +57,7 @@ function ResidentDashboard() {
 
       <Grid container spacing={2}>
         {dashboardItems.map((item) => (
-          <Grid item xs={12} sm={6} md={4} key={item.title}>
+          <Grid item sx={{ xs: 12, sm: 6, md: 4 }} key={item.title}>
             <Card 
               sx={{ 
                 height: '100%', 

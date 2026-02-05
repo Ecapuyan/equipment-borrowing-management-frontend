@@ -4,7 +4,7 @@ import {
   Typography, Box, CircularProgress, Card, CardContent, Grid, TextField, Button,
   Modal, Fade, Backdrop, Select, MenuItem, FormControl, InputLabel,
   IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, List, ListItem, ListItemText,
-  Stepper, Step, StepLabel, StepContent, useTheme, Divider
+  Stepper, Step, StepLabel, useTheme, Divider, useMediaQuery
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { db, storage } from '../firebase';
@@ -45,9 +45,9 @@ const calendarModalStyle = {
 // --- Step Content Components ---
 const Step1BorrowerInfo = ({ requestorInfo, handleInfoChange }) => (
   <Grid container spacing={3}>
-    <Grid item xs={12}><TextField fullWidth required label="Full Name" name="fullName" value={requestorInfo.fullName} onChange={handleInfoChange} variant="outlined" /></Grid>
-    <Grid item xs={12}><TextField fullWidth required label="Address" name="address" value={requestorInfo.address} onChange={handleInfoChange} variant="outlined" /></Grid>
-    <Grid item xs={12}><TextField fullWidth required label="Phone Number" name="phoneNumber" value={requestorInfo.phoneNumber} onChange={handleInfoChange} variant="outlined" /></Grid>
+    <Grid item sx={{ xs: 12 }}><TextField fullWidth required label="Full Name" name="fullName" value={requestorInfo.fullName} onChange={handleInfoChange} variant="outlined" /></Grid>
+    <Grid item sx={{ xs: 12 }}><TextField fullWidth required label="Address" name="address" value={requestorInfo.address} onChange={handleInfoChange} variant="outlined" /></Grid>
+    <Grid item sx={{ xs: 12 }}><TextField fullWidth required label="Phone Number" name="phoneNumber" value={requestorInfo.phoneNumber} onChange={handleInfoChange} variant="outlined" /></Grid>
   </Grid>
 );
 
@@ -60,32 +60,34 @@ const Step2RequestDetails = ({ reservationDate, setReservationDate, timeSlot, se
 
     return (
         <Grid container spacing={3}>
-            <Grid item xs={12}>
-               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, p: 2, bgcolor: 'primary.light', borderRadius: 2, color: 'primary.contrastText' }}>
-                   <CalendarMonthIcon sx={{ mr: 2 }} />
-                   <Typography variant="body2" sx={{ flexGrow: 1 }}>Check availability before selecting a date to ensure items are in stock.</Typography>
+            <Grid item sx={{ xs: 12 }}>
+               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, p: 2, bgcolor: 'primary.light', borderRadius: 2, color: 'primary.contrastText', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
+                   <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                       <CalendarMonthIcon sx={{ mr: 2 }} />
+                       <Typography variant="body2" sx={{ flexGrow: 1 }}>Check availability before selecting a date to ensure items are in stock.</Typography>
+                   </Box>
                    <Button 
                      variant="contained" 
                      color="secondary"
                      onClick={onCheckAvailability}
                      size="small"
+                     sx={{ width: { xs: '100%', sm: 'auto' } }}
                    >
                      Check Calendar
                    </Button>
                </Box>
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid item sx={{ xs: 12, sm: 6 }}>
                 <DatePicker 
                     label="Pick-up Date" 
                     value={reservationDate} 
                     onChange={(d) => setReservationDate(d)} 
-                    renderInput={(params) => <TextField {...params} fullWidth required />}
+                    slotProps={{ textField: { fullWidth: true, required: true } }}
                     minDate={minDate}
                     maxDate={maxDate}
-                    slotProps={{ textField: { fullWidth: true, required: true } }}
                 />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid item sx={{ xs: 12, sm: 6 }}>
                 <FormControl fullWidth required>
                     <InputLabel>Time Slot</InputLabel>
                     <Select 
@@ -99,7 +101,7 @@ const Step2RequestDetails = ({ reservationDate, setReservationDate, timeSlot, se
                     </Select>
                 </FormControl>
             </Grid>
-            <Grid item xs={12}><TextField fullWidth required multiline rows={4} label="Reason for Borrowing" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="E.g., Birthday party, Community meeting..."/></Grid>
+            <Grid item sx={{ xs: 12 }}><TextField fullWidth required multiline rows={4} label="Reason for Borrowing" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="E.g., Birthday party, Community meeting..."/></Grid>
         </Grid>
     );
 };
@@ -108,7 +110,7 @@ const Step3AddEquipment = ({ allEquipment, currentItemId, setCurrentItemId, curr
   <Box>
     <Paper elevation={0} variant="outlined" sx={{ p: 3, mb: 3, bgcolor: 'grey.50' }}>
         <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} sm={6}>
+            <Grid item sx={{ xs: 12, sm: 6 }}>
                 <FormControl fullWidth required size="small">
                     <InputLabel>Select Equipment</InputLabel>
                     <Select 
@@ -120,36 +122,62 @@ const Step3AddEquipment = ({ allEquipment, currentItemId, setCurrentItemId, curr
                     </Select>
                 </FormControl>
             </Grid>
-            <Grid item xs={6} sm={3}><TextField label="Qty" type="number" size="small" value={currentQuantity} onChange={e => setCurrentQuantity(e.target.value)} fullWidth InputProps={{ inputProps: { min: 1 } }} required/></Grid>
-            <Grid item xs={6} sm={3}><Button variant="contained" startIcon={<AddCircleIcon />} onClick={handleAddToCart} fullWidth>Add</Button></Grid>
-            {currentItemId && <Grid item xs={12}><Typography variant="caption" color="text.secondary">({availableStockHint} available for this date/slot)</Typography></Grid>}
+            <Grid item sx={{ xs: 6, sm: 3 }}><TextField label="Qty" type="number" size="small" value={currentQuantity} onChange={e => setCurrentQuantity(e.target.value)} fullWidth InputProps={{ inputProps: { min: 1 } }} required/></Grid>
+            <Grid item sx={{ xs: 6, sm: 3 }}><Button variant="contained" startIcon={<AddCircleIcon />} onClick={handleAddToCart} fullWidth>Add</Button></Grid>
+            {currentItemId && <Grid item sx={{ xs: 12 }}><Typography variant="caption" color="text.secondary">({availableStockHint} available for this date/slot)</Typography></Grid>}
         </Grid>
     </Paper>
     
     <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>Requested Items:</Typography>
     {cart.length > 0 ? (
-        <TableContainer component={Paper} variant="outlined">
-            <Table size="small">
-                <TableHead sx={{ bgcolor: 'grey.100' }}>
-                    <TableRow>
-                        <TableCell>Item</TableCell>
-                        <TableCell align="right">Qty</TableCell>
-                        <TableCell align="right">Action</TableCell>
-                    </TableRow>
-                </TableHead>
-                <TableBody>
-                    {cart.map(item => (
-                        <TableRow key={item.id}>
-                            <TableCell>{item.name}</TableCell>
-                            <TableCell align="right">{item.quantity}</TableCell>
-                            <TableCell align="right">
-                                <IconButton size="small" color="error" onClick={() => setCart(p => p.filter(i => i.id !== item.id))}><DeleteIcon/></IconButton>
-                            </TableCell>
+        <>
+            {/* Desktop Table View */}
+            <TableContainer component={Paper} variant="outlined" sx={{ display: { xs: 'none', sm: 'block' } }}>
+                <Table size="small">
+                    <TableHead sx={{ bgcolor: 'grey.100' }}>
+                        <TableRow>
+                            <TableCell>Item</TableCell>
+                            <TableCell align="right">Qty</TableCell>
+                            <TableCell align="right">Action</TableCell>
                         </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {cart.map(item => (
+                            <TableRow key={item.id}>
+                                <TableCell>{item.name}</TableCell>
+                                <TableCell align="right">{item.quantity}</TableCell>
+                                <TableCell align="right">
+                                    <IconButton size="small" color="error" onClick={() => setCart(p => p.filter(i => i.id !== item.id))}><DeleteIcon/></IconButton>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+            
+            {/* Mobile List View */}
+            <Paper variant="outlined" sx={{ display: { xs: 'block', sm: 'none' } }}>
+                <List>
+                    {cart.map((item, index) => (
+                        <React.Fragment key={item.id}>
+                            <ListItem
+                                secondaryAction={
+                                    <IconButton edge="end" aria-label="delete" color="error" onClick={() => setCart(p => p.filter(i => i.id !== item.id))}>
+                                        <DeleteIcon />
+                                    </IconButton>
+                                }
+                            >
+                                <ListItemText
+                                    primary={item.name}
+                                    secondary={`Quantity: ${item.quantity}`}
+                                />
+                            </ListItem>
+                            {index < cart.length - 1 && <Divider />}
+                        </React.Fragment>
                     ))}
-                </TableBody>
-            </Table>
-        </TableContainer>
+                </List>
+            </Paper>
+        </>
     ) : (
         <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 3 }}>No items added yet.</Typography>
     )}
@@ -158,7 +186,7 @@ const Step3AddEquipment = ({ allEquipment, currentItemId, setCurrentItemId, curr
 
 const Step4UploadDocs = ({ handleFileChange, idPreview, selfiePreview }) => (
     <Grid container spacing={3}>
-        <Grid item xs={12} sm={6}>
+        <Grid item sx={{ xs: 12, sm: 6 }}>
             <Paper variant="outlined" sx={{ p: 3, textAlign: 'center', borderStyle: 'dashed' }}>
                 <Typography gutterBottom fontWeight="bold">Upload ID Card <span style={{color: 'red'}}>*</span></Typography>
                 <Button variant="outlined" component="label" startIcon={<CloudUploadIcon />}>
@@ -168,7 +196,7 @@ const Step4UploadDocs = ({ handleFileChange, idPreview, selfiePreview }) => (
                 {idPreview && <Box component="img" src={idPreview} sx={{display: 'block', mx: 'auto', mt: 2, maxHeight: 150, maxWidth: '100%', borderRadius: 1}} />}
             </Paper>
         </Grid>
-        <Grid item xs={12} sm={6}>
+        <Grid item sx={{ xs: 12, sm: 6 }}>
             <Paper variant="outlined" sx={{ p: 3, textAlign: 'center', borderStyle: 'dashed' }}>
                 <Typography gutterBottom fontWeight="bold">Selfie with ID <span style={{color: 'red'}}>*</span></Typography>
                 <Button variant="outlined" component="label" startIcon={<CloudUploadIcon />}>
@@ -186,18 +214,18 @@ const Step5Review = ({ requestorInfo, reservationDate, timeSlot, reason, cart, i
         <Typography variant="h6" gutterBottom color="primary">Summary of Request</Typography>
         <Divider sx={{ mb: 2 }} />
         <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
+            <Grid item sx={{ xs: 12, sm: 6 }}>
                 <Typography variant="subtitle2" color="text.secondary">Borrower</Typography>
                 <Typography variant="body1" fontWeight="medium">{requestorInfo.fullName}</Typography>
                 <Typography variant="body2">{requestorInfo.address}</Typography>
                 <Typography variant="body2">{requestorInfo.phoneNumber}</Typography>
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid item sx={{ xs: 12, sm: 6 }}>
                 <Typography variant="subtitle2" color="text.secondary">Schedule</Typography>
                 <Typography variant="body1" fontWeight="medium">{reservationDate ? reservationDate.toLocaleDateString() : 'N/A'}</Typography>
                 <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>{timeSlot || 'N/A'}</Typography>
             </Grid>
-            <Grid item xs={12}>
+            <Grid item sx={{ xs: 12 }}>
                 <Typography variant="subtitle2" color="text.secondary">Reason</Typography>
                 <Typography variant="body2">{reason}</Typography>
             </Grid>
@@ -218,6 +246,7 @@ function BorrowEquipment() {
   const { currentUser } = useAuth();
   const { showSnackbar } = useSnackbar();
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
   const [modalOpen, setModalOpen] = useState(false);
   const [availabilityModalOpen, setAvailabilityModalOpen] = useState(false);
@@ -413,10 +442,10 @@ function BorrowEquipment() {
                 {/* Content */}
                 <Box sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, overflowY: 'auto' }}>
                     <Box sx={{ p: 2 }}>
-                        <Stepper activeStep={activeStep} alternativeLabel>
-                            {steps.map((step) => (
-                            <Step key={step.label}>
-                                <StepLabel><Typography variant="caption">{step.label}</Typography></StepLabel>
+                        <Stepper activeStep={activeStep} alternativeLabel={!isMobile} orientation={isMobile ? 'vertical' : 'horizontal'}>
+                            {steps.map((step, index) => (
+                            <Step key={step.label} completed={activeStep > index}>
+                                <StepLabel><Typography variant={isMobile ? "body2" : "caption"} sx={{ display: { xs: activeStep === index ? 'block' : 'none', sm: 'block' } }}>{step.label}</Typography></StepLabel>
                             </Step>
                             ))}
                         </Stepper>

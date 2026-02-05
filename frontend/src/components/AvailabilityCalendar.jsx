@@ -28,13 +28,12 @@ const AvailabilityCalendar = ({ allEquipment, allReservations }) => {
     const stats = allEquipment.map(item => {
       const totalStock = parseInt(item.totalStock || 0, 10);
       
-      // Filter reservations for this specific date and item
       const dailyReservations = allReservations.filter(r => 
         r.reservationDate && 
         r.reservationDate.toDate().toDateString() === dateStr &&
         r.items && 
         r.items.some(i => i.id === item.id) &&
-        (r.status === 'approved' || r.status === 'pending') // Count pending too to be safe
+        (r.status === 'approved' || r.status === 'pending' || r.status === 'delivered')
       );
 
       let morningReserved = 0;
@@ -53,11 +52,12 @@ const AvailabilityCalendar = ({ allEquipment, allReservations }) => {
             afternoonReserved += qty;
         }
       });
+      
+      const maxReserved = Math.max(morningReserved, afternoonReserved);
 
       return {
         ...item,
-        availableMorning: Math.max(0, totalStock - morningReserved),
-        availableAfternoon: Math.max(0, totalStock - afternoonReserved)
+        availableStock: Math.max(0, totalStock - maxReserved),
       };
     });
 
@@ -66,7 +66,7 @@ const AvailabilityCalendar = ({ allEquipment, allReservations }) => {
 
   return (
     <Grid container spacing={3}>
-      <Grid item xs={12} md={5}>
+      <Grid item sx={{ xs: 12, md: 5 }}>
         <Paper elevation={3} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <Typography variant="h6" gutterBottom>Select Date</Typography>
             <LocalizationProvider dateAdapter={AdapterDateFns}>
@@ -79,7 +79,7 @@ const AvailabilityCalendar = ({ allEquipment, allReservations }) => {
             </LocalizationProvider>
         </Paper>
       </Grid>
-      <Grid item xs={12} md={7}>
+      <Grid item sx={{ xs: 12, md: 7 }}>
         <Paper elevation={3} sx={{ p: 2, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <Typography variant="h6" gutterBottom>
                 Availability for {selectedDate.toLocaleDateString()}
@@ -89,8 +89,7 @@ const AvailabilityCalendar = ({ allEquipment, allReservations }) => {
                     <TableHead>
                         <TableRow>
                             <TableCell>Equipment</TableCell>
-                            <TableCell align="center">Morning (7am-2pm)</TableCell>
-                            <TableCell align="center">Afternoon (3pm-9pm)</TableCell>
+                            <TableCell align="center">Available for the Day</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -101,25 +100,17 @@ const AvailabilityCalendar = ({ allEquipment, allReservations }) => {
                                 </TableCell>
                                 <TableCell align="center">
                                     <Chip 
-                                        label={item.availableMorning} 
-                                        color={item.availableMorning > 0 ? "success" : "error"} 
+                                        label={item.availableStock} 
+                                        color={item.availableStock > 0 ? "success" : "error"} 
                                         size="small" 
-                                        variant={item.availableMorning > 0 ? "filled" : "outlined"}
-                                    />
-                                </TableCell>
-                                <TableCell align="center">
-                                    <Chip 
-                                        label={item.availableAfternoon} 
-                                        color={item.availableAfternoon > 0 ? "success" : "error"} 
-                                        size="small" 
-                                        variant={item.availableAfternoon > 0 ? "filled" : "outlined"}
+                                        variant={item.availableStock > 0 ? "filled" : "outlined"}
                                     />
                                 </TableCell>
                             </TableRow>
                         ))}
                         {availabilityList.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={3} align="center">No equipment found.</TableCell>
+                                <TableCell colSpan={2} align="center">No equipment found.</TableCell>
                             </TableRow>
                         )}
                     </TableBody>
@@ -132,3 +123,4 @@ const AvailabilityCalendar = ({ allEquipment, allReservations }) => {
 };
 
 export default AvailabilityCalendar;
+

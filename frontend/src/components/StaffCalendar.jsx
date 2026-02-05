@@ -92,7 +92,7 @@ export default function StaffCalendar({ reservations, onMarkDelivered }) {
   return (
     <Grid container spacing={3}>
       {/* Calendar Section - Left Side */}
-      <Grid item xs={12} md={5} lg={4}>
+      <Grid item sx={{ xs: 12, md: 5, lg: 4 }}>
         <Paper elevation={3} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <LocalizationProvider dateAdapter={AdapterDateFns}>
                 <DateCalendar
@@ -112,11 +112,11 @@ export default function StaffCalendar({ reservations, onMarkDelivered }) {
       </Grid>
       
       {/* Right Side Column - Agenda & Upcoming */}
-      <Grid item xs={12} md={7} lg={8}>
+      <Grid item sx={{ xs: 12, md: 7, lg: 8 }}>
         <Grid container spacing={3} direction="column">
             
             {/* Agenda Section */}
-            <Grid item xs={12}>
+            <Grid item sx={{ xs: 12 }}>
                 <Paper elevation={3} sx={{ p: 3, minHeight: 300 }}>
                     <Typography variant="h6" gutterBottom>
                         Agenda for {selectedDate.toLocaleDateString()}
@@ -165,7 +165,7 @@ export default function StaffCalendar({ reservations, onMarkDelivered }) {
             </Grid>
 
             {/* Upcoming Requests Section */}
-            <Grid item xs={12}>
+            <Grid item sx={{ xs: 12 }}>
                 <Paper elevation={3} sx={{ p: 3 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                         <LocalShippingIcon color="primary" />
@@ -182,7 +182,7 @@ export default function StaffCalendar({ reservations, onMarkDelivered }) {
                     ) : (
                         <Grid container spacing={2}>
                             {upcomingApprovedReservations.map((res) => (
-                                <Grid item xs={12} sm={6} key={res.id}>
+                                <Grid item sx={{ xs: 12, sm: 6 }} key={res.id}>
                                     <Paper variant="outlined" sx={{ p: 2, height: '100%', borderColor: res.reservationDate.toDate().toDateString() === new Date().toDateString() ? 'primary.main' : 'divider' }}>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                                             <Chip 

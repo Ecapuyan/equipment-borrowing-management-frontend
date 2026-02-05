@@ -68,7 +68,7 @@ function Profile() {
           </Typography>
           <Box component="form" onSubmit={handleSubmit} noValidate>
             <Grid container spacing={3}>
-              <Grid item xs={12}>
+              <Grid item sx={{ xs: 12 }}>
                 <TextField
                   fullWidth
                   label="Full Name"
@@ -78,7 +78,7 @@ function Profile() {
                   variant="outlined"
                 />
               </Grid>
-              <Grid item xs={12}>
+              <Grid item sx={{ xs: 12 }}>
                 <TextField
                   fullWidth
                   label="Address"
@@ -88,7 +88,7 @@ function Profile() {
                   variant="outlined"
                 />
               </Grid>
-              <Grid item xs={12}>
+              <Grid item sx={{ xs: 12 }}>
                 <TextField
                   fullWidth
                   label="Phone Number"
@@ -98,7 +98,7 @@ function Profile() {
                   variant="outlined"
                 />
               </Grid>
-              <Grid item xs={12}>
+              <Grid item sx={{ xs: 12 }}>
                 <TextField
                   fullWidth
                   disabled
@@ -108,7 +108,7 @@ function Profile() {
                   variant="outlined"
                 />
               </Grid>
-              <Grid item xs={12}>
+              <Grid item sx={{ xs: 12 }}>
                 <Typography variant="subtitle1" color="text.secondary">Role</Typography>
                 <Chip
                   label={profile.role}
@@ -116,7 +116,7 @@ function Profile() {
                   sx={{ textTransform: 'capitalize' }}
                 />
               </Grid>
-              <Grid item xs={12}>
+              <Grid item sx={{ xs: 12 }}>
                 <Button type="submit" variant="contained" color="primary">
                   Save Changes
                 </Button>

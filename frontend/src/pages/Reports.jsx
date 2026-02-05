@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Typography, Box, CircularProgress, Grid, Card, CardContent, Paper,
   Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Tabs, Tab, Chip, IconButton, useTheme
+  Tabs, Tab, Chip, IconButton, useTheme, Divider
 } from '@mui/material';
 import {
   Chart as ChartJS,
@@ -237,7 +237,7 @@ function Reports() {
   return (
     <Box sx={{ pb: 5 }}>
         {/* Header */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
             <Box>
                 <Typography variant="h4" fontWeight="bold" gutterBottom>Reports & Analytics</Typography>
                 <Typography variant="subtitle1" color="text.secondary">Overview of equipment usage and incidents.</Typography>
@@ -246,6 +246,8 @@ function Reports() {
                 variant="contained" 
                 startIcon={<DownloadIcon />} 
                 onClick={exportPDF}
+                fullWidth={false}
+                sx={{ width: { xs: '100%', sm: 'auto' } }}
             >
                 Export Report
             </Button>
@@ -253,7 +255,7 @@ function Reports() {
 
         {/* KPI Cards */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item sx={{ xs: 12, sm: 6, md: 3 }}>
                 <StatCard 
                     title="Total Reservations" 
                     value={kpi.totalReservations} 
@@ -261,7 +263,7 @@ function Reports() {
                     color={theme.palette.primary.main} 
                 />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item sx={{ xs: 12, sm: 6, md: 3 }}>
                 <StatCard 
                     title="Active Loans" 
                     value={kpi.active} 
@@ -269,7 +271,7 @@ function Reports() {
                     color={theme.palette.success.main} 
                 />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item sx={{ xs: 12, sm: 6, md: 3 }}>
                 <StatCard 
                     title="Incidents Reported" 
                     value={kpi.damagedCount} 
@@ -277,7 +279,7 @@ function Reports() {
                     color={theme.palette.error.main} 
                 />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item sx={{ xs: 12, sm: 6, md: 3 }}>
                 <StatCard 
                     title="Total Fines (PHP)" 
                     value={`P${kpi.totalFines.toLocaleString()}`} 
@@ -289,7 +291,7 @@ function Reports() {
 
         {/* Charts Section */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
-            <Grid item xs={12} md={6}>
+            <Grid item sx={{ xs: 12, md: 6 }}>
                 <Paper elevation={3} sx={{ p: 3, height: 400, display: 'flex', flexDirection: 'column' }}>
                     <Typography variant="h6" gutterBottom fontWeight="bold">Most Borrowed Equipment</Typography>
                     <Box sx={{ flexGrow: 1, position: 'relative' }}>
@@ -297,7 +299,7 @@ function Reports() {
                     </Box>
                 </Paper>
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item sx={{ xs: 12, md: 6 }}>
                 <Paper elevation={3} sx={{ p: 3, height: 400, display: 'flex', flexDirection: 'column' }}>
                     <Typography variant="h6" gutterBottom fontWeight="bold">Monthly Reservation Trends</Typography>
                     <Box sx={{ flexGrow: 1, position: 'relative' }}>
@@ -314,6 +316,8 @@ function Reports() {
                 onChange={(e, v) => setTabValue(v)} 
                 indicatorColor="primary" 
                 textColor="primary"
+                variant="scrollable"
+                scrollButtons="auto"
                 sx={{ borderBottom: 1, borderColor: 'divider', px: 2, pt: 2 }}
             >
                 <Tab label="Transaction Log" />
@@ -322,7 +326,9 @@ function Reports() {
             
             <Box sx={{ p: 0 }}>
                 {tabValue === 0 && (
-                    <TableContainer sx={{ maxHeight: 440 }}>
+                    <>
+                    {/* Desktop Table View */}
+                    <TableContainer sx={{ maxHeight: 440, display: { xs: 'none', md: 'block' } }}>
                         <Table stickyHeader>
                             <TableHead>
                                 <TableRow>
@@ -361,10 +367,45 @@ function Reports() {
                             </TableBody>
                         </Table>
                     </TableContainer>
+
+                    {/* Mobile Card View */}
+                    <Box sx={{ display: { xs: 'block', md: 'none' }, p: 2 }}>
+                        {reservations.length === 0 ? <Typography align="center">No records found</Typography> : 
+                            reservations.slice(0, 50).map((row) => (
+                                <Card key={row.id} variant="outlined" sx={{ mb: 2 }}>
+                                    <CardContent>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                            <Typography variant="caption" color="text.secondary">
+                                                {row.reservationDate?.toDate().toLocaleDateString()}
+                                            </Typography>
+                                            <Chip 
+                                                label={row.status} 
+                                                size="small" 
+                                                color={
+                                                    row.status === 'approved' ? 'success' : 
+                                                    row.status === 'pending' ? 'warning' : 
+                                                    row.status === 'returned' ? 'default' : 
+                                                    row.status === 'delivered' ? 'info' : 'error'
+                                                }
+                                                sx={{ textTransform: 'capitalize' }}
+                                            />
+                                        </Box>
+                                        <Typography variant="subtitle2" fontWeight="bold">{row.fullName}</Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {Array.isArray(row.items) ? row.items.map(i => i.name).join(', ') : 'N/A'}
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            ))
+                        }
+                    </Box>
+                    </>
                 )}
 
                 {tabValue === 1 && (
-                    <TableContainer sx={{ maxHeight: 440 }}>
+                    <>
+                    {/* Desktop Table View */}
+                    <TableContainer sx={{ maxHeight: 440, display: { xs: 'none', md: 'block' } }}>
                         <Table stickyHeader>
                             <TableHead>
                                 <TableRow>
@@ -398,6 +439,36 @@ function Reports() {
                             </TableBody>
                         </Table>
                     </TableContainer>
+
+                    {/* Mobile Card View */}
+                    <Box sx={{ display: { xs: 'block', md: 'none' }, p: 2 }}>
+                        {incidents.length === 0 ? <Typography align="center">No incidents reported</Typography> : 
+                            incidents.map((row) => (
+                                <Card key={row.id} variant="outlined" sx={{ mb: 2 }}>
+                                    <CardContent>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                            <Typography variant="caption" color="text.secondary">
+                                                {row.dateReported?.toDate().toLocaleDateString()}
+                                            </Typography>
+                                            <Typography variant="subtitle2" color="error.main" fontWeight="bold">
+                                                P{Number(row.cost).toLocaleString()}
+                                            </Typography>
+                                        </Box>
+                                        <Typography variant="subtitle1" fontWeight="bold">{row.residentName}</Typography>
+                                        <Typography variant="body2" gutterBottom>{row.equipmentName}</Typography>
+                                        
+                                        <Divider sx={{ my: 1 }} />
+                                        
+                                        <Chip label={row.type} color="error" size="small" variant="outlined" sx={{ textTransform: 'capitalize', mr: 1 }} />
+                                        <Typography variant="caption" component="span" color="text.secondary">
+                                            {row.description}
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            ))
+                        }
+                    </Box>
+                    </>
                 )}
             </Box>
         </Paper>

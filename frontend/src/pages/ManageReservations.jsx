@@ -4,7 +4,8 @@ import {
   Typography, Box, CircularProgress, Card, CardContent, Chip, Button,
   Modal, Fade, Backdrop, Grid, Divider, List, ListItem, ListItemText, Paper, Link,
   FormControlLabel, Switch, TextField, Select, MenuItem, FormControl, InputLabel,
-  useTheme, IconButton, Tooltip
+  useTheme, IconButton, Tooltip, InputAdornment, Tabs, Tab, Badge,
+  Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle
 } from '@mui/material';
 import { DataGrid, gridClasses } from '@mui/x-data-grid';
 import { db } from '../firebase';
@@ -12,6 +13,15 @@ import { collection, getDocs, doc, updateDoc, query, where, addDoc, Timestamp } 
 import { useSnackbar } from '../context/SnackbarContextDef';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import SearchIcon from '@mui/icons-material/Search';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import PhoneIcon from '@mui/icons-material/Phone';
+import PersonIcon from '@mui/icons-material/Person';
+import ContactPageIcon from '@mui/icons-material/ContactPage';
+import AccessTimeIcon from '@mui/icons-material/AccessTime'; // New Import
 
 const modalStyle = {
   position: 'absolute',
@@ -38,103 +48,133 @@ function ManageReservations() {
   const [reservations, setReservations] = useState([]);
   const [equipments, setEquipments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { showSnackbar } = useSnackbar();
+  const { showSnackbar }
+        = useSnackbar();
   const theme = useTheme();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('pending');
+  const [zoomedImage, setZoomedImage] = useState(null);
   
-  // Detail Modal State
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState(null);
 
-  // Return/Incident Modal State
   const [returnModalOpen, setReturnModalOpen] = useState(false);
-  const [returnIssue, setReturnIssue] = useState({
-    hasIssue: false,
-    itemId: '',
-    type: 'damaged',
-    description: '',
-    cost: ''
-  });
+  const [returnIssue, setReturnIssue] = useState({ hasIssue: false, itemId: '', type: 'damaged', description: '', cost: '' });
+
+  const [outstandingDialog, setOutstandingDialog] = useState({ isOpen: false, reservation: null, newStatus: null });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const reservationsSnapshot = await getDocs(collection(db, 'reservations'));
       const reservationData = reservationsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      reservationData.sort((a, b) => (b.requestDate?.seconds || 0) - (a.requestDate?.seconds || 0));
       setReservations(reservationData);
 
       const equipmentSnapshot = await getDocs(collection(db, 'equipments'));
       const equipmentData = equipmentSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
       setEquipments(equipmentData);
 
-    } catch (err) { 
-      console.error("Failed to load reservation data.", err);
-      showSnackbar("Failed to load reservation data.", "error"); 
-    } 
+    } catch (err) { showSnackbar("Failed to load reservation data.", "error"); } 
     finally { setLoading(false); }
   }, [showSnackbar]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleOpenModal = (reservation) => {
-    setSelectedReservation(reservation);
-    setModalOpen(true);
-  };
-  const handleCloseModal = () => {
-    setModalOpen(false);
-    setSelectedReservation(null);
+  const getDeliveryTime = (reservationDate, timeSlot) => {
+    if (!reservationDate || !timeSlot) return null;
+    const date = reservationDate.toDate(); // Convert Firebase Timestamp to Date object
+    if (timeSlot === 'morning' || timeSlot === 'fullday') {
+      date.setHours(7, 0, 0, 0); // 7 AM
+    } else if (timeSlot === 'afternoon') {
+      date.setHours(15, 0, 0, 0); // 3 PM
+    }
+    return date;
   };
 
-  const handleOpenReturnModal = () => {
-    setReturnIssue({ hasIssue: false, itemId: '', type: 'damaged', description: '', cost: '' });
-    setReturnModalOpen(true);
+  const counts = {
+    pending: reservations.filter(r => r.status === 'pending').length,
+    approved: reservations.filter(r => r.status === 'approved').length,
+    delivered: reservations.filter(r => r.status === 'delivered').length,
   };
+
+  const filteredReservations = reservations.filter(res => {
+    const search = searchTerm.toLowerCase();
+    const matchesSearch = searchTerm === '' ||
+        (res.fullName && res.fullName.toLowerCase().includes(search)) ||
+        (res.status && res.status.toLowerCase().includes(search)) ||
+        (res.id && res.id.toLowerCase().includes(search));
+    
+    if (!matchesSearch) return false;
+    if (statusFilter === 'all') return true;
+    if (statusFilter === 'returned') return ['returned', 'completed'].includes(res.status);
+    if (statusFilter === 'issues') return res.hasIncident === true;
+    
+    return res.status === statusFilter;
+  });
+
+  const handleOpenModal = (reservation) => { setSelectedReservation(reservation); setModalOpen(true); };
+  const handleCloseModal = () => { setModalOpen(false); setSelectedReservation(null); };
+  const handleOpenReturnModal = () => { setReturnIssue({ hasIssue: false, itemId: '', type: 'damaged', description: '', cost: '' }); setReturnModalOpen(true); };
 
   const handleReturnSubmit = async () => {
     if (!selectedReservation) return;
-
+  
+    setLoading(true);
     try {
-      // 1. If there's an issue, report it
+      const reservationRef = doc(db, 'reservations', selectedReservation.id);
+      let newStatus = 'returned';
+  
+      // If there's an issue, create an incident report
       if (returnIssue.hasIssue) {
-        if (!returnIssue.itemId || !returnIssue.description) {
-            showSnackbar("Please select the item and describe the issue.", "warning");
-            return;
+        if (!returnIssue.itemId || !returnIssue.description || !returnIssue.cost) {
+          showSnackbar("Please fill all fields for the incident report.", "error");
+          setLoading(false);
+          return;
         }
-        
-        const affectedItem = selectedReservation.items.find(i => i.id === returnIssue.itemId);
 
-        await addDoc(collection(db, 'incident_reports'), {
-            reservationId: selectedReservation.id,
-            residentName: selectedReservation.fullName,
-            residentId: selectedReservation.userId,
-            equipmentId: returnIssue.itemId,
-            equipmentName: affectedItem?.name || 'Unknown Item',
-            type: returnIssue.type,
-            description: returnIssue.description,
-            cost: returnIssue.cost || 0,
-            status: 'open',
-            dateReported: Timestamp.now()
+        newStatus = 'completed'; // Or a more specific status like 'returned_with_issue'
+        await addDoc(collection(db, 'incidents'), {
+          reservationId: selectedReservation.id,
+          userId: selectedReservation.userId,
+          fullName: selectedReservation.fullName,
+          item: {
+            id: returnIssue.itemId,
+            name: selectedReservation.items.find(i => i.id === returnIssue.itemId)?.name,
+          },
+          type: returnIssue.type,
+          description: returnIssue.description,
+          cost: parseFloat(returnIssue.cost),
+          status: 'pending_payment',
+          reportedAt: Timestamp.now(),
         });
+
+        // Mark the reservation as having an incident
+        await updateDoc(reservationRef, { hasIncident: true });
+        showSnackbar('Incident report created successfully.', 'info');
       }
-
-      // 2. Mark reservation as returned
-      await updateDoc(doc(db, 'reservations', selectedReservation.id), { 
-          status: 'returned',
-          returnDate: Timestamp.now(),
-          hasIncident: returnIssue.hasIssue 
-      });
-
-      showSnackbar(`Reservation marked as returned${returnIssue.hasIssue ? ' with incident report' : ''}.`, 'success');
-      fetchData();
-      setReturnModalOpen(false);
-      handleCloseModal(); 
-
+  
+      // Update the reservation status
+      await updateDoc(reservationRef, { status: newStatus });
+  
+      // We are not updating stock here assuming totalStock is the overall count
+      // and availability is managed by checking reservations.
+      // If stock count needs to be dynamically changed, logic would be added here.
+  
+      showSnackbar(`Reservation marked as ${newStatus}.`, 'success');
+      fetchData(); // Refresh data
+      setReturnModalOpen(false); // Close return modal
+      handleCloseModal(); // Close main details modal
+  
     } catch (err) {
-      console.error("Error processing return:", err);
-      showSnackbar("Failed to process return.", "error");
+      console.error("Error processing return: ", err);
+      showSnackbar('Failed to process the return.', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleStatusUpdate = async (reservation, newStatus) => {
+  const proceedWithStatusUpdate = async (reservation, newStatus) => {
     try {
       if (newStatus === 'approved') {
         const approvedReservationsQuery = query(collection(db, 'reservations'), where('status', '==', 'approved'), where('reservationDate', '==', reservation.reservationDate));
@@ -165,8 +205,31 @@ function ManageReservations() {
       fetchData();
       handleCloseModal();
     } catch (err) {
-      console.error("Failed to update reservation status.", err);
       showSnackbar("Failed to update reservation status.", 'error');
+    }
+  };
+  
+  const handleStatusUpdate = async (reservation, newStatus) => {
+    if (newStatus !== 'delivered') {
+        await proceedWithStatusUpdate(reservation, newStatus);
+        return;
+    }
+
+    try {
+        const q = query(
+            collection(db, 'reservations'),
+            where('userId', '==', reservation.userId),
+            where('status', '==', 'delivered')
+        );
+        const snapshot = await getDocs(q);
+        
+        if (!snapshot.empty) {
+            setOutstandingDialog({ isOpen: true, reservation, newStatus });
+        } else {
+            await proceedWithStatusUpdate(reservation, newStatus);
+        }
+    } catch (err) {
+        showSnackbar("Failed to check for outstanding reservations.", "error");
     }
   };
   
@@ -174,52 +237,45 @@ function ManageReservations() {
     { field: 'fullName', headerName: 'Resident Name', flex: 1.5, minWidth: 150 },
     { field: 'reason', headerName: 'Reason', flex: 2, minWidth: 200 },
     {
-      field: 'items',
-      headerName: 'Equipments',
-      flex: 1,
-      minWidth: 150,
+      field: 'items', headerName: 'Equipments', flex: 1, minWidth: 150,
       renderCell: (params) => {
         const itemCount = Array.isArray(params.row.items) ? params.row.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
-        return (
-            <Chip 
-                label={`${itemCount} Item${itemCount !== 1 ? 's' : ''}`} 
-                size="small" 
-                variant="outlined"
-            />
-        );
+        return <Chip label={`${itemCount} Item${itemCount !== 1 ? 's' : ''}`} size="small" variant="outlined" />;
       },
     },
+    { field: 'reservationDate', headerName: 'Date', flex: 1, minWidth: 120, renderCell: (params) => (params.value ? new Date(params.value.seconds * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A') },
     {
-      field: 'reservationDate', headerName: 'Date', flex: 1, minWidth: 120,
-      renderCell: (params) => (params.value ? new Date(params.value.seconds * 1000).toLocaleDateString() : 'N/A'),
-    },
-    {
-      field: 'status', headerName: 'Status', flex: 1, minWidth: 120,
+        field: 'deliveryTime',
+        headerName: 'Delivery Time',
+        flex: 1,
+        minWidth: 150,
+        renderCell: (params) => {
+          if (params.row.status === 'approved' || params.row.status === 'pending') {
+              const deliveryTime = getDeliveryTime(params.row.reservationDate, params.row.timeSlot);
+              return deliveryTime ? (
+                  <Box>
+                      <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>{params.row.timeSlot}</Typography>
+                      <Typography variant="caption" color="text.secondary">{deliveryTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Typography>
+                  </Box>
+              ) : 'N/A';
+          }
+          return 'N/A';
+        },
+      },
+    { field: 'status', headerName: 'Status', flex: 1, minWidth: 120,
       renderCell: (params) => {
         const status = params.value;
         let color = 'default';
         if (status === 'pending') color = 'warning';
         if (status === 'approved') color = 'success';
         if (status === 'delivered') color = 'info';
-        if (status === 'rejected' || status === 'cancelled' || status === 'returned') color = 'error';
-        return (
-            <Chip 
-                label={status} 
-                color={color} 
-                size="small" 
-                sx={{ textTransform: 'capitalize', fontWeight: 'bold' }}
-            />
-        );
+        if (status === 'rejected' || status === 'cancelled') color = 'error';
+        return <Chip label={status} color={color} size="small" sx={{ textTransform: 'capitalize', fontWeight: 'bold' }} />;
       },
     },
-    {
-        field: 'actions', headerName: 'Actions', sortable: false, flex: 1, minWidth: 100, align: 'right', headerAlign: 'right',
+    { field: 'actions', headerName: 'Actions', sortable: false, flex: 1, minWidth: 150, align: 'right', headerAlign: 'right',
         renderCell: (params) => (
-            <Tooltip title="View Details">
-                <IconButton onClick={() => handleOpenModal(params.row)} color="primary" size="small">
-                    <VisibilityIcon />
-                </IconButton>
-            </Tooltip>
+            <Button onClick={() => handleOpenModal(params.row)} color="primary" size="small" startIcon={<VisibilityIcon />} variant="outlined" sx={{ textTransform: 'none' }}>View Details</Button>
         ),
     },
   ];
@@ -230,146 +286,249 @@ function ManageReservations() {
         <Typography variant="h4" fontWeight="bold" gutterBottom>Reservations</Typography>
         <Typography variant="subtitle1" color="text.secondary">Manage and track all equipment borrowing requests.</Typography>
       </Box>
-
       <Card sx={{ boxShadow: theme.shadows[2], borderRadius: 2 }}>
         <CardContent sx={{ p: 0 }}>
-          <Box sx={{ height: 650, width: '100%' }}>
-            <DataGrid
-                rows={reservations}
-                columns={columns}
-                loading={loading}
-                getRowId={(row) => row.id}
-                sx={{
-                    border: 'none',
-                    '& .MuiDataGrid-columnHeaders': {
-                        backgroundColor: theme.palette.grey[50],
-                        color: theme.palette.text.primary,
-                        fontSize: '0.9rem',
-                        fontWeight: 'bold',
-                    },
-                    [`& .${gridClasses.row}.even`]: {
-                        backgroundColor: theme.palette.grey[50],
-                    },
-                    '& .MuiDataGrid-cell': {
-                        borderBottom: `1px solid ${theme.palette.divider}`,
-                    }
-                }}
-            />
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2, pt: 2, bgcolor: 'grey.50' }}>
+            <Tabs value={statusFilter} onChange={(e, v) => setStatusFilter(v)} variant="scrollable" scrollButtons="auto">
+                <Tab label={<Badge badgeContent={counts.pending} color="error" sx={{ pr: 2 }}>Request for Approval</Badge>} value="pending" />
+                <Tab label={<Badge badgeContent={counts.approved} color="success" sx={{ pr: 2 }}>Approved</Badge>} value="approved" />
+                <Tab label={<Badge badgeContent={counts.delivered} color="info" sx={{ pr: 2 }}>Delivered (To Return)</Badge>} value="delivered" />
+                <Tab label="Returned" value="returned" />
+                <Tab label="With Issues" value="issues" />
+            </Tabs>
+          </Box>
+          <Box sx={{ p: 2 }}>
+            <TextField fullWidth variant="outlined" size="small" placeholder="Search by name, status, or ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} sx={{ mb: 2 }} InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon color="action" /></InputAdornment>), }} />
+            <Box sx={{ height: 650, width: '100%' }}>
+                <DataGrid rows={filteredReservations} columns={columns} loading={loading} getRowId={(row) => row.id} disableSelectionOnClick sx={{ border: 'none' }} />
+            </Box>
           </Box>
         </CardContent>
       </Card>
-
-      {/* Detail Modal */}
-      <Modal open={modalOpen} onClose={handleCloseModal} closeAfterTransition BackdropComponent={Backdrop} BackdropProps={{ timeout: 500 }}>
+      <Modal open={modalOpen} onClose={handleCloseModal} closeAfterTransition BackdropComponent={Backdrop} BackdropProps={{ timeout: 500 }} disableRestoreFocus>
         <Fade in={modalOpen}>
           <Box sx={modalStyle}>
-            {/* Header */}
             <Box sx={{ p: 3, bgcolor: 'primary.main', color: 'white' }}>
                  <Typography variant="h6" fontWeight="bold">Reservation Details</Typography>
             </Box>
-
-            {/* Content */}
-            <Box sx={{ p: 4, overflowY: 'auto', flexGrow: 1 }}>
+            <Box sx={{ p: 3, overflowY: 'auto', flexGrow: 1 }}>
                 {selectedReservation && (
-                <Grid container spacing={3}>
-                    {/* Borrower Info Section */}
-                    <Grid item xs={12}>
-                        <Typography variant="subtitle2" color="primary" gutterBottom sx={{ textTransform: 'uppercase', letterSpacing: 1, fontWeight: 'bold' }}>Borrower Info</Typography>
-                        <Paper variant="outlined" sx={{ p: 2 }}>
-                            <Grid container spacing={2}>
-                                <Grid item xs={6}>
-                                    <Typography variant="caption" color="text.secondary">Name</Typography>
-                                    <Typography variant="body2" fontWeight="medium">{selectedReservation.fullName}</Typography>
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <Typography variant="caption" color="text.secondary">Phone</Typography>
-                                    <Typography variant="body2" fontWeight="medium">{selectedReservation.phoneNumber}</Typography>
-                                </Grid>
-                                <Grid item xs={12}>
-                                    <Typography variant="caption" color="text.secondary">Address</Typography>
-                                    <Typography variant="body2" fontWeight="medium">{selectedReservation.address}</Typography>
-                                </Grid>
-                            </Grid>
-                        </Paper>
-                    </Grid>
+                <Box sx={{ p: 3 }}>
+                    {/* Header Summary */}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                        <Box>
+                            <Typography variant="h5" fontWeight="bold" color="primary.main">
+                                Reservation #{selectedReservation.id.slice(0, 6).toUpperCase()}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                Requested on {selectedReservation.requestDate?.toDate().toLocaleString()}
+                            </Typography>
+                        </Box>
+                        <Chip 
+                            label={selectedReservation.status} 
+                            color={
+                                selectedReservation.status === 'approved' ? 'success' : 
+                                selectedReservation.status === 'pending' ? 'warning' : 
+                                selectedReservation.status === 'delivered' ? 'info' : 
+                                selectedReservation.status === 'returned' ? 'default' : 'error'
+                            }
+                            sx={{ fontWeight: 'bold', textTransform: 'capitalize', fontSize: '0.9rem', height: 32 }}
+                        />
+                    </Box>
 
-                    {/* Request Details Section */}
-                    <Grid item xs={12}>
-                        <Typography variant="subtitle2" color="primary" gutterBottom sx={{ textTransform: 'uppercase', letterSpacing: 1, fontWeight: 'bold', mt: 2 }}>Request Details</Typography>
-                        <Paper variant="outlined" sx={{ p: 2 }}>
-                            <Grid container spacing={2}>
-                                <Grid item xs={6}>
-                                    <Typography variant="caption" color="text.secondary">Pick-up Date</Typography>
-                                    <Typography variant="body2" fontWeight="medium">{selectedReservation.reservationDate ? new Date(selectedReservation.reservationDate.seconds * 1000).toLocaleDateString() : 'N/A'}</Typography>
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <Typography variant="caption" color="text.secondary">Time Slot</Typography>
-                                    <Typography variant="body2" fontWeight="medium" sx={{ textTransform: 'capitalize' }}>{selectedReservation.timeSlot}</Typography>
-                                </Grid>
-                                <Grid item xs={12}>
-                                    <Typography variant="caption" color="text.secondary">Reason</Typography>
-                                    <Typography variant="body2">{selectedReservation.reason}</Typography>
-                                </Grid>
-                                <Grid item xs={12}>
-                                    <Divider sx={{ my: 1 }} />
-                                    <Typography variant="caption" color="text.secondary" gutterBottom>Items Requested</Typography>
-                                    <List dense disablePadding>
-                                        {Array.isArray(selectedReservation.items) ? selectedReservation.items.map(item => (
-                                            <ListItem key={item.id} disableGutters>
-                                                <ListItemText primary={item.name} secondary={`Qty: ${item.quantity}`} />
+                    <Grid container spacing={3}>
+                        {/* Left Column: Borrower Profile */}
+                        <Grid item xs={12} md={5}>
+                            <Card sx={{ height: '100%', borderRadius: 2, boxShadow: 1 }}>
+                                <CardContent sx={{ p: 3 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                                        <Box sx={{ bgcolor: 'primary.light', p: 1.5, borderRadius: '50%', color: 'white' }}>
+                                            <PersonIcon fontSize="large" />
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="subtitle1" fontWeight="bold">{selectedReservation.fullName}</Typography>
+                                            <Typography variant="body2" color="text.secondary">Resident</Typography>
+                                        </Box>
+                                    </Box>
+                                    
+                                    <Divider sx={{ mb: 3 }} />
+
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                                        <Box sx={{ display: 'flex', gap: 2 }}>
+                                            <PhoneIcon color="action" fontSize="small" sx={{ mt: 0.3 }} />
+                                            <Box>
+                                                <Typography variant="caption" color="text.secondary" fontWeight="bold">PHONE</Typography>
+                                                <Typography variant="body2">{selectedReservation.phoneNumber}</Typography>
+                                            </Box>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', gap: 2 }}>
+                                            <LocationOnIcon color="action" fontSize="small" sx={{ mt: 0.3 }} />
+                                            <Box>
+                                                <Typography variant="caption" color="text.secondary" fontWeight="bold">ADDRESS</Typography>
+                                                <Typography variant="body2">{selectedReservation.address}</Typography>
+                                            </Box>
+                                        </Box>
+                                    </Box>
+
+                                    <Divider sx={{ my: 3 }} />
+                                    
+                                    <Typography variant="subtitle2" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <ContactPageIcon fontSize="small" /> Verification
+                                    </Typography>
+                                    <Grid container spacing={1} sx={{ mt: 0.5 }}>
+                                        <Grid item xs={6}>
+                                            <Typography variant="caption" display="block" gutterBottom align="center">ID Card</Typography>
+                                            <Box 
+                                                onClick={() => selectedReservation.idCardUrl && setZoomedImage(selectedReservation.idCardUrl)}
+                                                sx={{ 
+                                                    width: '100%', 
+                                                    height: 140, 
+                                                    borderRadius: 2, 
+                                                    bgcolor: 'grey.100', 
+                                                    border: '1px solid #eee',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: 'text.disabled',
+                                                    fontSize: '0.75rem',
+                                                    overflow: 'hidden',
+                                                    cursor: selectedReservation.idCardUrl ? 'pointer' : 'default',
+                                                    transition: 'all 0.2s',
+                                                    '&:hover': selectedReservation.idCardUrl ? {
+                                                        transform: 'scale(1.02)',
+                                                        boxShadow: 2
+                                                    } : {}
+                                                }}
+                                            >
+                                                {selectedReservation.idCardUrl ? (
+                                                    <Box component="img" src={selectedReservation.idCardUrl} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                ) : (
+                                                    "No Image"
+                                                )}
+                                            </Box>
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <Typography variant="caption" display="block" gutterBottom align="center">Selfie</Typography>
+                                            <Box 
+                                                onClick={() => selectedReservation.selfieUrl && setZoomedImage(selectedReservation.selfieUrl)}
+                                                sx={{ 
+                                                    width: '100%', 
+                                                    height: 140, 
+                                                    borderRadius: 2, 
+                                                    bgcolor: 'grey.100', 
+                                                    border: '1px solid #eee',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: 'text.disabled',
+                                                    fontSize: '0.75rem',
+                                                    overflow: 'hidden',
+                                                    cursor: selectedReservation.selfieUrl ? 'pointer' : 'default',
+                                                    transition: 'all 0.2s',
+                                                    '&:hover': selectedReservation.selfieUrl ? {
+                                                        transform: 'scale(1.02)',
+                                                        boxShadow: 2
+                                                    } : {}
+                                                }}
+                                            >
+                                                {selectedReservation.selfieUrl ? (
+                                                    <Box component="img" src={selectedReservation.selfieUrl} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                ) : (
+                                                    "No Image"
+                                                )}
+                                            </Box>
+                                        </Grid>
+                                    </Grid>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+
+                        {/* Right Column: Request Specifics */}
+                        <Grid item xs={12} md={7}>
+                            <Card sx={{ height: '100%', borderRadius: 2, boxShadow: 1 }}>
+                                <CardContent sx={{ p: 3 }}>
+                                    <Typography variant="h6" fontWeight="bold" gutterBottom>Request Details</Typography>
+                                    
+                                    <Box sx={{ bgcolor: 'primary.50', p: 2, borderRadius: 2, display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                                        <CalendarTodayIcon color="primary" />
+                                        <Box>
+                                            <Typography variant="subtitle2" fontWeight="bold" color="primary.main">
+                                                {selectedReservation.reservationDate ? new Date(selectedReservation.reservationDate.seconds * 1000).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A'}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
+                                                Time Slot: {selectedReservation.timeSlot}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+
+                                    <Typography variant="caption" fontWeight="bold" color="text.secondary" gutterBottom display="block">REASON FOR BORROWING</Typography>
+                                    <Typography variant="body2" sx={{ mb: 3, fontStyle: 'italic', bgcolor: 'grey.50', p: 1.5, borderRadius: 1, borderLeft: '3px solid #ccc' }}>
+                                        "{selectedReservation.reason}"
+                                    </Typography>
+
+                                    <Typography variant="caption" fontWeight="bold" color="text.secondary" gutterBottom display="block">ITEMS REQUESTED</Typography>
+                                    <List disablePadding sx={{ border: '1px solid #eee', borderRadius: 1 }}>
+                                        {Array.isArray(selectedReservation.items) ? selectedReservation.items.map((item, index) => (
+                                            <ListItem key={item.id} divider={index < selectedReservation.items.length - 1} sx={{ py: 1 }}>
+                                                <ListItemText 
+                                                    primary={<Typography variant="body2" fontWeight="medium">{item.name}</Typography>} 
+                                                />
+                                                <Chip label={`x${item.quantity}`} size="small" variant="outlined" sx={{ fontWeight: 'bold' }} />
                                             </ListItem>
-                                        )) : <Typography variant="caption">N/A</Typography>}
+                                        )) : <Typography variant="caption" sx={{ p: 2 }}>N/A</Typography>}
                                     </List>
-                                </Grid>
-                            </Grid>
-                        </Paper>
+                                </CardContent>
+                            </Card>
+                        </Grid>
                     </Grid>
-
-                    {/* Verification Documents */}
-                    <Grid item xs={12}>
-                         <Typography variant="subtitle2" color="primary" gutterBottom sx={{ textTransform: 'uppercase', letterSpacing: 1, fontWeight: 'bold', mt: 2 }}>Documents</Typography>
-                         <Grid container spacing={2}>
-                             <Grid item xs={6}>
-                                <Typography variant="caption" display="block" gutterBottom>ID Card</Typography>
-                                {selectedReservation.idCardUrl ? 
-                                    <Box component="img" src={selectedReservation.idCardUrl} sx={{ width: '100%', borderRadius: 1, border: '1px solid #ddd', maxHeight: 150, objectFit: 'cover' }} /> 
-                                    : <Typography variant="caption">Not Provided</Typography>
-                                }
-                             </Grid>
-                             <Grid item xs={6}>
-                                <Typography variant="caption" display="block" gutterBottom>Selfie</Typography>
-                                {selectedReservation.selfieUrl ? 
-                                    <Box component="img" src={selectedReservation.selfieUrl} sx={{ width: '100%', borderRadius: 1, border: '1px solid #ddd', maxHeight: 150, objectFit: 'cover' }} /> 
-                                    : <Typography variant="caption">Not Provided</Typography>
-                                }
-                             </Grid>
-                         </Grid>
-                    </Grid>
-                </Grid>
+                </Box>
                 )}
             </Box>
-
-            {/* Footer Actions */}
             <Box sx={{ p: 3, bgcolor: 'grey.50', display: 'flex', justifyContent: 'flex-end', gap: 2, borderTop: '1px solid', borderColor: 'divider' }}>
                 <Button onClick={handleCloseModal} variant="outlined">Close</Button>
-                {selectedReservation && selectedReservation.status === 'pending' && (
-                    <>
-                        <Button onClick={() => handleStatusUpdate(selectedReservation, 'rejected')} variant="contained" color="error">Reject</Button>
-                        <Button onClick={() => handleStatusUpdate(selectedReservation, 'approved')} variant="contained" color="success">Approve</Button>
-                    </>
+                {selectedReservation && selectedReservation.status === 'pending' && (<>
+                    <Button onClick={() => handleStatusUpdate(selectedReservation, 'rejected')} variant="contained" color="error">Reject</Button>
+                    <Button onClick={() => handleStatusUpdate(selectedReservation, 'approved')} variant="contained" color="success">Approve</Button>
+                </>)}
+                {selectedReservation && selectedReservation.status === 'approved' && (
+                    <Button onClick={() => handleStatusUpdate(selectedReservation, 'delivered')} variant="contained" color="primary">Mark as Delivered</Button>
                 )}
-                {selectedReservation && (selectedReservation.status === 'approved' || selectedReservation.status === 'delivered') && (
-                    <Button onClick={handleOpenReturnModal} variant="contained" startIcon={<AssignmentTurnedInIcon />}>
-                        Mark Returned
-                    </Button>
+                {selectedReservation && (selectedReservation.status === 'delivered') && (
+                    <Button onClick={handleOpenReturnModal} variant="contained" startIcon={<AssignmentTurnedInIcon />}>Mark Returned</Button>
                 )}
             </Box>
           </Box>
         </Fade>
       </Modal>
+      {/* Image Zoom Modal */}
+      <Modal 
+        open={!!zoomedImage} 
+        onClose={() => setZoomedImage(null)} 
+        closeAfterTransition 
+        BackdropComponent={Backdrop} 
+        BackdropProps={{ timeout: 500 }}
+        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2 }}
+        disableRestoreFocus
+      >
+        <Fade in={!!zoomedImage}>
+            <Box 
+                component="img" 
+                src={zoomedImage} 
+                sx={{ 
+                    maxHeight: '90vh', 
+                    maxWidth: '90vw', 
+                    borderRadius: 2, 
+                    boxShadow: 24, 
+                    outline: 'none',
+                    bgcolor: 'background.paper' 
+                }} 
+                onClick={() => setZoomedImage(null)}
+            />
+        </Fade>
+      </Modal>
 
       {/* Return Inspection Modal */}
-      <Modal open={returnModalOpen} onClose={() => setReturnModalOpen(false)} closeAfterTransition BackdropComponent={Backdrop} BackdropProps={{ timeout: 500 }}>
+      <Modal open={returnModalOpen} onClose={() => setReturnModalOpen(false)} closeAfterTransition BackdropComponent={Backdrop} BackdropProps={{ timeout: 500 }} disableRestoreFocus>
         <Fade in={returnModalOpen}>
             <Box sx={returnModalStyle}>
                 <Typography variant="h5" fontWeight="bold" gutterBottom>Return Inspection</Typography>
@@ -435,6 +594,26 @@ function ManageReservations() {
             </Box>
         </Fade>
       </Modal>
+      <Dialog
+        open={outstandingDialog.isOpen}
+        onClose={() => setOutstandingDialog({ isOpen: false, reservation: null, newStatus: null })}
+      >
+        <DialogTitle>{"Outstanding Reservation Found"}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This resident has another reservation that is still marked as 'delivered'. Do you want to proceed with marking this new reservation as 'delivered' anyway?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOutstandingDialog({ isOpen: false, reservation: null, newStatus: null })}>Cancel</Button>
+          <Button onClick={async () => {
+              await proceedWithStatusUpdate(outstandingDialog.reservation, outstandingDialog.newStatus);
+              setOutstandingDialog({ isOpen: false, reservation: null, newStatus: null });
+          }} autoFocus>
+            Proceed
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

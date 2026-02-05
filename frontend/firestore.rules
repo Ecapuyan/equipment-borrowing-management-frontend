@@ -1,24 +1,62 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // USER COLLECTION RULES
-    match /users/{userId} {
-      // Allow users to read and write their own profile
-      // Allow any authenticated user to read profiles (needed for UserManagement list)
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
-      // Allow staff to update roles (this is a simplified rule for dev)
-      allow update: if request.auth != null; 
+
+    // Helper functions to check user roles
+    function isRole(role) {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
 
-    // GENERAL RULES (Fallback for other collections like equipments, reservations)
-    // For development, we allow all authenticated users to read/write these collections.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    function isOneOfRoles(roles) {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in roles;
     }
+
+    // USER COLLECTION RULES
+    match /users/{userId} {
+      // Staff/Admins can read all user profiles. Users can only read their own.
+      allow read: if isOneOfRoles(['staff', 'admin']) || request.auth.uid == userId;
+
+      // A user can be created during sign-up.
+      allow create: if request.auth.uid == userId;
+
+      // Define update permissions
+      allow update: if
+        // Admins can update any user, but cannot promote others to 'admin'.
+        (isRole('admin') && (request.auth.uid == userId || request.resource.data.role != 'admin')) ||
+        // Non-admins can only update their own profile, and cannot change their role.
+        (request.auth.uid == userId && request.resource.data.role == resource.data.role);
+
+      // Only admins can delete users.
+      allow delete: if isRole('admin');
+    }
+
+    // EQUIPMENT COLLECTION RULES
+    match /equipments/{equipmentId} {
+      // Any authenticated user can view equipment.
+      allow read: if request.auth != null;
+      // Staff and admins can create and update equipment.
+      allow create, update: if isOneOfRoles(['staff', 'admin']);
+      // Only admins can delete equipment.
+      allow delete: if isRole('admin');
+    }
+
+    // RESERVATIONS COLLECTION RULES
+    match /reservations/{reservationId} {
+      // Users can read their own reservations. Staff/Admins can read all reservations.
+      allow read: if isOneOfRoles(['staff', 'admin']) || resource.data.userId == request.auth.uid;
+      // Any authenticated user can create a reservation.
+      allow create: if request.auth != null;
+      // Users can update their own reservations. Staff/Admins can update any reservation.
+      allow update: if isOneOfRoles(['staff', 'admin']) || resource.data.userId == request.auth.uid;
+       // Users can delete their own reservations. Staff/Admins can delete any reservation.
+      allow delete: if isOneOfRoles(['staff', 'admin']) || resource.data.userId == request.auth.uid;
+    }
+
+    // INVENTORY LOGS COLLECTION RULES
     match /inventory_logs/{logId} {
-      allow read, write: if true;
+      // Only staff and admins can read or write inventory logs.
+      allow read, write: if isOneOfRoles(['staff', 'admin']);
     }
   }
 }

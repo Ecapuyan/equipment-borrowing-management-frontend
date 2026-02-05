@@ -85,10 +85,10 @@ function Register() {
        {/* Left Side - Brand / Image */}
        <Grid
         item
-        xs={false}
-        sm={4}
-        md={7}
         sx={{
+          xs: false,
+          sm: 4,
+          md: 7,
           backgroundImage: 'url(https://source.unsplash.com/random?community,park)',
           backgroundRepeat: 'no-repeat',
           backgroundColor: (t) => t.palette.primary.main,
@@ -119,7 +119,7 @@ function Register() {
       </Grid>
 
       {/* Right Side - Register Form */}
-      <Grid item xs={12} sm={8} md={5} component={Paper} elevation={6} square sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Grid item sx={{ xs: 12, sm: 8, md: 5 }} component={Paper} elevation={6} square sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Box
           sx={{
             my: 8,
@@ -142,7 +142,7 @@ function Register() {
 
           <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1, width: '100%' }}>
             <Grid container spacing={2}>
-              <Grid item xs={12}>
+              <Grid item sx={{ xs: 12 }}>
                 <TextField
                   required
                   fullWidth
@@ -158,7 +158,7 @@ function Register() {
                   }}
                 />
               </Grid>
-              <Grid item xs={12}>
+              <Grid item sx={{ xs: 12 }}>
                 <TextField
                   required
                   fullWidth
@@ -173,7 +173,7 @@ function Register() {
                   }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item sx={{ xs: 12, sm: 6 }}>
                 <TextField
                   required
                   fullWidth
@@ -188,7 +188,7 @@ function Register() {
                   }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item sx={{ xs: 12, sm: 6 }}>
                 <TextField
                   required
                   fullWidth
@@ -203,7 +203,7 @@ function Register() {
                   }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item sx={{ xs: 12, sm: 6 }}>
                 <TextField
                   required
                   fullWidth
@@ -226,7 +226,7 @@ function Register() {
                   }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item sx={{ xs: 12, sm: 6 }}>
                 <TextField
                   required
                   fullWidth

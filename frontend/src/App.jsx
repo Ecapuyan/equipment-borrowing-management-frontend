@@ -3,7 +3,7 @@ import Layout from './components/Layout';
 import PublicRoute from './components/PublicRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import PrivateRoute from './components/PrivateRoute';
+import RoleBasedRoute from './components/RoleBasedRoute';
 import StaffDashboard from './pages/StaffDashboard';
 import ResidentDashboard from './pages/ResidentDashboard';
 import ManageEquipment from './pages/ManageEquipment';
@@ -13,6 +13,20 @@ import UserManagement from './pages/UserManagement';
 import ManageReservations from './pages/ManageReservations';
 import Profile from './pages/Profile';
 import Reports from './pages/Reports';
+import { useAuth } from './context/AuthContextDef';
+
+const HomeRedirect = () => {
+  const { currentUser } = useAuth();
+  if (!currentUser) return null; // Or a loading spinner
+
+  if (currentUser.role === 'admin') {
+    return <Navigate to="/user-management" replace />;
+  }
+  if (currentUser.role === 'staff') {
+    return <Navigate to="/staff-dashboard" replace />;
+  }
+  return <Navigate to="/resident-dashboard" replace />;
+};
 
 function App() {
   return (
@@ -23,29 +37,38 @@ function App() {
         <Route path="/register" element={<Register />} />
       </Route>
 
-      {/* Protected dashboard routes */}
+      {/* Protected Routes */}
       <Route
-        path="/*" // All other routes are protected
+        path="/"
         element={
-          <PrivateRoute>
+          <RoleBasedRoute>
             <Layout />
-          </PrivateRoute>
+          </RoleBasedRoute>
         }
       >
-        <Route index element={<Navigate to="/resident-dashboard" replace />} /> {/* Default route redirection */}
+        <Route index element={<HomeRedirect />} />
         <Route path="profile" element={<Profile />} />
-        <Route path="staff-dashboard" element={<StaffDashboard />} />
-        <Route path="staff/manage-equipment" element={<ManageEquipment />} />
-        <Route path="staff/user-management" element={<UserManagement />} />
-        <Route path="staff/manage-reservations" element={<ManageReservations />} />
-        <Route path="staff/reports" element={<Reports />} />
 
-        <Route path="resident-dashboard" element={<ResidentDashboard />} />
-        <Route path="resident/borrow-equipment" element={<BorrowEquipment />} />
-        <Route path="resident/my-reservations" element={<MyReservations />} />
+        {/* Staff and Admin Routes */}
+        <Route path="staff-dashboard" element={<RoleBasedRoute roles={['staff', 'admin']}><StaffDashboard /></RoleBasedRoute>} />
+        <Route path="staff/manage-equipment" element={<RoleBasedRoute roles={['staff', 'admin']}><ManageEquipment /></RoleBasedRoute>} />
+        <Route path="staff/manage-reservations" element={<RoleBasedRoute roles={['staff', 'admin']}><ManageReservations /></RoleBasedRoute>} />
+        <Route path="staff/reports" element={<RoleBasedRoute roles={['staff', 'admin']}><Reports /></RoleBasedRoute>} />
 
-        {/* Redirect any other nested path to the home/dashboard */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* User Management for Admin/Staff */}
+        <Route path="user-management" element={<RoleBasedRoute roles={['admin', 'staff']}><UserManagement /></RoleBasedRoute>} />
+
+        {/* Resident Routes */}
+        <Route path="resident-dashboard" element={<RoleBasedRoute roles={['resident']}><ResidentDashboard /></RoleBasedRoute>} />
+        <Route path="resident/borrow-equipment" element={<RoleBasedRoute roles={['resident']}><BorrowEquipment /></RoleBasedRoute>} />
+        <Route path="resident/my-reservations" element={<RoleBasedRoute roles={['resident']}><MyReservations /></RoleBasedRoute>} />
+
+        {/* Redirect old paths */}
+        <Route path="admin/user-management" element={<Navigate to="/user-management" replace />} />
+        <Route path="staff/user-management" element={<Navigate to="/user-management" replace />} />
+
+        {/* Fallback for any other authenticated path */}
+        <Route path="*" element={<HomeRedirect />} />
       </Route>
     </Routes>
   );

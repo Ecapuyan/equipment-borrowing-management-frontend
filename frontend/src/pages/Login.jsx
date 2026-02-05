@@ -112,19 +112,18 @@ function Login() {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            maxWidth: 450,
-            width: '100%'
+            p: 4,
+            border: '1px solid #e0e0e0',
+            borderRadius: '12px',
+            boxShadow: '0px 4px 20px rgba(0,0,0,0.05)'
           }}
         >
-          <Box sx={{ mb: 3, textAlign: 'center' }}>
-              <Typography component="h1" variant="h4" fontWeight="bold" color="primary">
-                Welcome Back
-              </Typography>
-              <Typography variant="body1" color="text.secondary">
-                Please sign in to continue
-              </Typography>
-          </Box>
-          
+          <Typography component="h1" variant="h4" fontWeight="bold" gutterBottom color="primary">
+            Welcome Back!
+          </Typography>
+          <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 3 }}>
+            Sign in to access the Barangay Masambong Equipment Management System.
+          </Typography>
           <Box component="form" noValidate onSubmit={handleSubmit} sx={{ mt: 1, width: '100%' }}>
             <TextField
               margin="normal"
@@ -140,7 +139,7 @@ function Login() {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <EmailIcon color="action" />
+                    <EmailIcon />
                   </InputAdornment>
                 ),
               }}
@@ -159,7 +158,7 @@ function Login() {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <LockIcon color="action" />
+                    <LockIcon />
                   </InputAdornment>
                 ),
                 endAdornment: (
@@ -175,13 +174,11 @@ function Login() {
                 ),
               }}
             />
-            
             <Button
               type="submit"
               fullWidth
               variant="contained"
-              size="large"
-              sx={{ mt: 4, mb: 2, py: 1.5, fontSize: '1.1rem' }}
+              sx={{ mt: 3, mb: 2, py: 1.5, borderRadius: '8px', fontWeight: 'bold' }}
             >
               Sign In
             </Button>

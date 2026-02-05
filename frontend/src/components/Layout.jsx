@@ -1,7 +1,9 @@
 // src/components/Layout.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContextDef';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
 import {
   AppBar,
   Box,
@@ -18,7 +20,8 @@ import {
   Avatar,
   Menu,
   MenuItem,
-  useTheme
+  useTheme,
+  Badge
 } from '@mui/material';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import BookOnlineIcon from '@mui/icons-material/BookOnline';
@@ -31,6 +34,10 @@ import PersonIcon from '@mui/icons-material/Person';
 import StorageIcon from '@mui/icons-material/Storage';
 import ViewListIcon from '@mui/icons-material/ViewList';
 
+import Chatbot from './chatbot/Chatbot';
+import { Fab } from '@mui/material';
+import ChatIcon from '@mui/icons-material/Chat';
+
 const drawerWidth = 260;
 
 function Layout() {
@@ -41,10 +48,23 @@ function Layout() {
   
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [showChatbot, setShowChatbot] = useState(false);
+
+  useEffect(() => {
+    if (currentUser && ['staff', 'admin'].includes(currentUser.role)) {
+      const q = query(collection(db, 'reservations'), where('status', '==', 'pending'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        setPendingCount(snapshot.size);
+      });
+      return () => unsubscribe();
+    }
+  }, [currentUser]);
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
   const handleMenuOpen = (event) => setAnchorEl(event.currentTarget);
   const handleMenuClose = () => setAnchorEl(null);
+  const toggleChatbot = () => setShowChatbot((prev) => !prev);
 
   const handleLogout = async () => {
     try {
@@ -58,12 +78,20 @@ function Layout() {
 
   const isActive = (path) => location.pathname === path;
 
-  const staffLinks = [
+  const adminLinks = [
     { text: 'Dashboard', path: '/staff-dashboard', icon: <DashboardIcon /> },
+    { text: 'User Management', path: '/user-management', icon: <PeopleIcon /> },
+    { text: 'Reservations', path: '/staff/manage-reservations', icon: <BookOnlineIcon /> },
     { text: 'Reports', path: '/staff/reports', icon: <AssessmentIcon /> },
     { text: 'Equipment', path: '/staff/manage-equipment', icon: <StorageIcon /> },
-    { text: 'Users', path: '/staff/user-management', icon: <PeopleIcon /> },
+  ];
+
+  const staffLinks = [
+    { text: 'Dashboard', path: '/staff-dashboard', icon: <DashboardIcon /> },
+    { text: 'Users', path: '/user-management', icon: <PeopleIcon /> },
     { text: 'Reservations', path: '/staff/manage-reservations', icon: <BookOnlineIcon /> },
+    { text: 'Reports', path: '/staff/reports', icon: <AssessmentIcon /> },
+    { text: 'Equipment', path: '/staff/manage-equipment', icon: <StorageIcon /> },
   ];
 
   const residentLinks = [
@@ -71,11 +99,22 @@ function Layout() {
     { text: 'Borrow Equipment', path: '/resident/borrow-equipment', icon: <ViewListIcon /> },
     { text: 'My Reservations', path: '/resident/my-reservations', icon: <BookOnlineIcon /> },
   ];
+  
+  const getLinks = () => {
+    switch (currentUser?.role) {
+      case 'admin':
+        return adminLinks;
+      case 'staff':
+        return staffLinks;
+      case 'resident':
+        return residentLinks;
+      default:
+        return [];
+    }
+  };
 
-  // Drawer Content with Modern Gradient Style
   const drawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'primary.dark', color: 'white' }}>
-      {/* Sidebar Header */}
       <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
         <Avatar 
           sx={{ bgcolor: 'secondary.main', width: 40, height: 40, boxShadow: 3 }}
@@ -93,9 +132,8 @@ function Layout() {
       </Box>
       <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
       
-      {/* Navigation Links */}
       <List sx={{ px: 2, pt: 2, flexGrow: 1 }}>
-        {currentUser && (currentUser.role === 'staff' ? staffLinks : residentLinks).map((item) => (
+        {getLinks().map((item) => (
           <ListItemButton 
             component={RouterLink} 
             to={item.path} 
@@ -113,7 +151,13 @@ function Layout() {
             }}
           >
             <ListItemIcon sx={{ color: isActive(item.path) ? 'secondary.light' : 'rgba(255,255,255,0.7)', minWidth: 40 }}>
-              {item.icon}
+              {item.text === 'Reservations' && pendingCount > 0 ? (
+                  <Badge badgeContent={pendingCount} color="error" overlap="circular">
+                      {item.icon}
+                  </Badge>
+              ) : (
+                  item.icon
+              )}
             </ListItemIcon>
             <ListItemText primary={item.text} primaryTypographyProps={{ fontSize: 14, fontWeight: isActive(item.path) ? 600 : 400 }} />
           </ListItemButton>
@@ -132,7 +176,6 @@ function Layout() {
     <Box sx={{ display: 'flex' }}>
       <CssBaseline />
       
-      {/* Modern Top AppBar */}
       <AppBar
         position="fixed"
         elevation={0}
@@ -165,7 +208,6 @@ function Layout() {
              </Typography>
           </Box>
 
-          {/* User Menu */}
           {currentUser ? (
              <Box>
                 <IconButton onClick={handleMenuOpen} size="small" sx={{ ml: 2 }}>
@@ -203,7 +245,6 @@ function Layout() {
         </Toolbar>
       </AppBar>
 
-      {/* Navigation Drawer */}
       <Box
         component="nav"
         sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
@@ -232,7 +273,6 @@ function Layout() {
         </Drawer>
       </Box>
 
-      {/* Main Content Area */}
       <Box
         component="main"
         sx={{ 
@@ -246,9 +286,22 @@ function Layout() {
         <Toolbar /> 
         <Outlet />
       </Box>
+
+      {currentUser && (
+        <>
+          <Fab 
+            color="primary" 
+            aria-label="chat" 
+            sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1400 }}
+            onClick={toggleChatbot}
+          >
+            <ChatIcon />
+          </Fab>
+          {showChatbot && <Chatbot toggleChatbot={toggleChatbot} />}
+        </>
+      )}
     </Box>
   );
 }
 
 export default Layout;
-

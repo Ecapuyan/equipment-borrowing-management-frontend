@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Typography, Box, TextField, Button, CircularProgress, Grid, Card, CardContent,
-  useTheme, IconButton, Tooltip, Paper, Modal, Fade, Backdrop, List, ListItem, ListItemText, Divider
+  useTheme, IconButton, Tooltip, Paper, Modal, Fade, Backdrop, List, ListItem, ListItemText, Divider,
+  InputAdornment, Chip, Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import { DataGrid, gridClasses } from '@mui/x-data-grid';
 import { db } from '../firebase';
@@ -17,6 +18,9 @@ import SaveIcon from '@mui/icons-material/Save';
 import HistoryIcon from '@mui/icons-material/History';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import SearchIcon from '@mui/icons-material/Search';
+import WarningIcon from '@mui/icons-material/Warning';
+import ManageIcon from '@mui/icons-material/ManageAccounts'; // Reusing the icon for consistency
 
 const historyModalStyle = {
   position: 'absolute',
@@ -42,6 +46,8 @@ function ManageEquipment() {
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [currentEquipmentId, setCurrentEquipmentId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [formOpen, setFormOpen] = useState(false);
   
   // History Modal State
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
@@ -69,6 +75,11 @@ function ManageEquipment() {
   useEffect(() => {
     fetchEquipments();
   }, [fetchEquipments]);
+
+  const filteredEquipments = equipments.filter(item => 
+    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const fetchHistory = async (equipmentId, equipmentName) => {
     setHistoryLoading(true);
@@ -198,6 +209,12 @@ function ManageEquipment() {
     setEquipmentDescription(equipment.description);
     setTotalStock(equipment.totalStock);
     setAdjustmentReason(''); // Reset reason
+    setFormOpen(true);
+  };
+
+  const handleAddNew = () => {
+      resetForm();
+      setFormOpen(true);
   };
 
   const resetForm = () => {
@@ -207,6 +224,7 @@ function ManageEquipment() {
     setEquipmentDescription('');
     setTotalStock(1);
     setAdjustmentReason('');
+    setFormOpen(false);
   };
 
   const columns = [
@@ -217,12 +235,19 @@ function ManageEquipment() {
       headerName: 'Stock',
       type: 'number',
       flex: 0.5,
-      minWidth: 100,
+      minWidth: 120,
       align: 'center',
       headerAlign: 'center',
       renderCell: (params) => (
-         <Box sx={{ fontWeight: 'bold', color: params.value > 0 ? 'success.main' : 'error.main' }}>
-            {params.value}
+         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+            <Typography fontWeight="bold" color={params.value > 0 ? 'success.main' : 'error.main'}>
+                {params.value}
+            </Typography>
+            {params.value < 5 && params.value > 0 && (
+                <Tooltip title="Low Stock">
+                    <WarningIcon color="warning" fontSize="small" />
+                </Tooltip>
+            )}
          </Box>
       )
     },
@@ -235,83 +260,179 @@ function ManageEquipment() {
       align: 'right',
       headerAlign: 'right',
       renderCell: (params) => (
-        <Box>
-          <Tooltip title="View History">
-             <IconButton onClick={() => fetchHistory(params.row.id, params.row.name)} color="info" size="small">
-                <HistoryIcon />
-             </IconButton>
-          </Tooltip>
-          <Tooltip title="Edit">
-             <IconButton onClick={() => handleEdit(params.row)} color="primary" size="small">
-                <EditIcon />
-             </IconButton>
-          </Tooltip>
-          <Tooltip title="Delete">
-             <IconButton onClick={() => handleDelete(params.row.id)} color="error" size="small">
-                <DeleteIcon />
-             </IconButton>
-          </Tooltip>
-        </Box>
+        <Button 
+            variant="outlined" 
+            size="small" 
+            startIcon={<ManageIcon />} 
+            onClick={() => handleEdit(params.row)}
+            sx={{ textTransform: 'none' }}
+        >
+            Manage
+        </Button>
       ),
     },
   ];
 
   return (
     <Box>
-       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight="bold" gutterBottom>Equipment Inventory</Typography>
-        <Typography variant="subtitle1" color="text.secondary">Manage available items and track stock history.</Typography>
+       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
+        <Box>
+            <Typography variant="h4" fontWeight="bold" gutterBottom>Equipment Inventory</Typography>
+            <Typography variant="subtitle1" color="text.secondary">Manage available items and track stock history.</Typography>
+        </Box>
+        <Button 
+            variant="contained" 
+            startIcon={<AddCircleOutlineIcon />} 
+            onClick={handleAddNew}
+            size="large"
+            sx={{ width: { xs: '100%', sm: 'auto' } }}
+        >
+            Add New Equipment
+        </Button>
       </Box>
 
-      <Grid container spacing={4}>
-        {/* Form Section */}
-        <Grid item xs={12} lg={4}>
-          <Paper elevation={0} variant="outlined" sx={{ p: 3, bgcolor: 'background.paper', borderRadius: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                {editMode ? <EditIcon color="primary" sx={{ mr: 1 }}/> : <AddCircleOutlineIcon color="primary" sx={{ mr: 1 }}/>}
-                <Typography variant="h6" fontWeight="bold">
-                {editMode ? 'Edit Equipment' : 'Add New Item'}
-                </Typography>
-            </Box>
+      <Card sx={{ boxShadow: theme.shadows[2], borderRadius: 2 }}>
+        <CardContent sx={{ p: 2 }}>
             
-            <Box component="form" onSubmit={handleSubmit}>
-              <TextField
-                label="Item Name"
-                fullWidth
-                value={equipmentName}
-                onChange={(e) => setEquipmentName(e.target.value)}
-                margin="normal"
-                required
-                variant="outlined"
-                size="small"
-              />
-              <TextField
-                label="Description"
-                fullWidth
-                multiline
-                rows={4}
-                value={equipmentDescription}
-                onChange={(e) => setEquipmentDescription(e.target.value)}
-                margin="normal"
-                required
-                variant="outlined"
-                size="small"
-              />
-              <TextField
-                label="Total Stock"
-                fullWidth
-                type="number"
-                value={totalStock}
-                onChange={(e) => setTotalStock(e.target.value)}
-                margin="normal"
-                required
-                variant="outlined"
-                size="small"
-                InputProps={{ inputProps: { min: 0 } }}
-                helperText={editMode ? "Changing this will log an adjustment." : ""}
-              />
-              
-              {editMode && (
+            {/* Search Bar */}
+            <TextField
+            fullWidth
+            variant="outlined"
+            size="small"
+            placeholder="Search equipment..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            sx={{ mb: 2 }}
+            InputProps={{
+                startAdornment: (
+                    <InputAdornment position="start">
+                        <SearchIcon color="action" />
+                    </InputAdornment>
+                ),
+            }}
+            />
+
+            {/* Desktop View (DataGrid) */}
+            <Box sx={{ height: 600, width: '100%', display: { xs: 'none', md: 'block' } }}>
+            <DataGrid
+                rows={filteredEquipments}
+                columns={columns}
+                pageSize={10}
+                rowsPerPageOptions={[10]}
+                loading={loading}
+                disableSelectionOnClick
+                sx={{
+                border: 'none',
+                '& .MuiDataGrid-columnHeaders': {
+                    backgroundColor: theme.palette.grey[50],
+                    color: theme.palette.text.primary,
+                    fontSize: '0.9rem',
+                    fontWeight: 'bold',
+                },
+                [`& .${gridClasses.row}.even`]: {
+                    backgroundColor: theme.palette.grey[50],
+                },
+                '& .MuiDataGrid-cell': {
+                    borderBottom: `1px solid ${theme.palette.divider}`,
+                }
+                }}
+                components={{
+                LoadingOverlay: CircularProgress,
+                }}
+            />
+            </Box>
+
+            {/* Mobile View (Cards) */}
+            <Box sx={{ display: { xs: 'block', md: 'none' } }}>
+                {loading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                    <CircularProgress />
+                </Box>
+                ) : filteredEquipments.length === 0 ? (
+                <Typography align="center" color="text.secondary" sx={{ py: 3 }}>
+                    No equipment found.
+                </Typography>
+                ) : (
+                filteredEquipments.map((item) => (
+                    <Card key={item.id} variant="outlined" sx={{ mb: 2 }}>
+                        <CardContent>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                                <Typography variant="h6" fontWeight="bold">
+                                    {item.name}
+                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    {item.totalStock < 5 && item.totalStock > 0 && <WarningIcon color="warning" fontSize="small"/>}
+                                    <Chip 
+                                        label={`Stock: ${item.totalStock}`} 
+                                        color={item.totalStock > 0 ? 'success' : 'error'} 
+                                        size="small" 
+                                    />
+                                </Box>
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                {item.description}
+                            </Typography>
+                            <Divider sx={{ my: 1 }} />
+                            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                <Button 
+                                    variant="outlined" 
+                                    size="small" 
+                                    startIcon={<ManageIcon />} 
+                                    onClick={() => handleEdit(item)}
+                                    fullWidth
+                                >
+                                    Manage
+                                </Button>
+                            </Box>
+                        </CardContent>
+                    </Card>
+                ))
+                )}
+            </Box>
+
+        </CardContent>
+      </Card>
+
+      {/* Add/Edit Equipment Dialog */}
+      <Dialog open={formOpen} onClose={resetForm} fullWidth maxWidth="sm">
+        <DialogTitle fontWeight="bold">
+             {editMode ? 'Manage Equipment' : 'Add New Equipment'}
+        </DialogTitle>
+        <DialogContent dividers>
+             <Box component="form" sx={{ mt: 1 }}>
+                <TextField
+                    label="Item Name"
+                    fullWidth
+                    value={equipmentName}
+                    onChange={(e) => setEquipmentName(e.target.value)}
+                    margin="normal"
+                    required
+                    variant="outlined"
+                />
+                <TextField
+                    label="Description"
+                    fullWidth
+                    multiline
+                    rows={4}
+                    value={equipmentDescription}
+                    onChange={(e) => setEquipmentDescription(e.target.value)}
+                    margin="normal"
+                    required
+                    variant="outlined"
+                />
+                <TextField
+                    label="Total Stock"
+                    fullWidth
+                    type="number"
+                    value={totalStock}
+                    onChange={(e) => setTotalStock(e.target.value)}
+                    margin="normal"
+                    required
+                    variant="outlined"
+                    InputProps={{ inputProps: { min: 0 } }}
+                    helperText={editMode ? "Changing this will log an adjustment." : ""}
+                />
+                {editMode && (
                 <TextField 
                     label="Reason for Adjustment"
                     fullWidth
@@ -319,66 +440,44 @@ function ManageEquipment() {
                     onChange={(e) => setAdjustmentReason(e.target.value)}
                     margin="normal"
                     variant="outlined"
-                    size="small"
                     placeholder="e.g., Damaged, New purchase, Correction"
                     helperText="Optional but recommended for audit trail."
                 />
-              )}
-
-              <Box sx={{ mt: 3, display: 'flex', gap: 1 }}>
-                  <Button 
-                    type="submit" 
-                    variant="contained" 
-                    fullWidth 
-                    startIcon={editMode ? <SaveIcon /> : <AddCircleOutlineIcon />}
-                  >
-                    {editMode ? 'Save Changes' : 'Add Item'}
-                  </Button>
-                  {editMode && (
-                    <Button variant="outlined" color="inherit" fullWidth onClick={resetForm} startIcon={<CancelIcon />}>
-                      Cancel
+                )}
+             </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, justifyContent: 'space-between' }}>
+             <Box>
+                {editMode && (
+                    <Button 
+                        startIcon={<HistoryIcon />} 
+                        color="info" 
+                        onClick={() => fetchHistory(currentEquipmentId, equipmentName)}
+                    >
+                        Audit Log
                     </Button>
-                  )}
-              </Box>
-            </Box>
-          </Paper>
-        </Grid>
-
-        {/* Data Grid Section */}
-        <Grid item xs={12} lg={8}>
-          <Card sx={{ boxShadow: theme.shadows[2], borderRadius: 2 }}>
-            <CardContent sx={{ p: 0 }}>
-              <Box sx={{ height: 600, width: '100%' }}>
-                <DataGrid
-                  rows={equipments}
-                  columns={columns}
-                  pageSize={10}
-                  rowsPerPageOptions={[10]}
-                  loading={loading}
-                  sx={{
-                    border: 'none',
-                    '& .MuiDataGrid-columnHeaders': {
-                        backgroundColor: theme.palette.grey[50],
-                        color: theme.palette.text.primary,
-                        fontSize: '0.9rem',
-                        fontWeight: 'bold',
-                    },
-                    [`& .${gridClasses.row}.even`]: {
-                        backgroundColor: theme.palette.grey[50],
-                    },
-                    '& .MuiDataGrid-cell': {
-                        borderBottom: `1px solid ${theme.palette.divider}`,
-                    }
-                  }}
-                  components={{
-                    LoadingOverlay: CircularProgress,
-                  }}
-                />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+                )}
+             </Box>
+             <Box sx={{ display: 'flex', gap: 1 }}>
+                {editMode && currentUser.role === 'admin' && (
+                    <Button 
+                        startIcon={<DeleteIcon />} 
+                        color="error" 
+                        onClick={() => {
+                            handleDelete(currentEquipmentId);
+                            resetForm();
+                        }}
+                    >
+                        Delete
+                    </Button>
+                )}
+                <Button onClick={resetForm} color="inherit">Cancel</Button>
+                <Button onClick={handleSubmit} variant="contained" color="primary">
+                    Save Changes
+                </Button>
+             </Box>
+        </DialogActions>
+      </Dialog>
 
       {/* Audit Trail Modal */}
       <Modal 
